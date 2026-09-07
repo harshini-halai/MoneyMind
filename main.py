@@ -9,4 +9,4 @@ expenses.append({
 })
 
 for expense in expenses:
-    print(expense.get("description"), "-", expense.get("amount"))
+    print(expense.get("description"), "- ₹", expense.get("amount"))
