@@ -18,6 +18,5 @@ while True:
 
 print("\nYour Expenses:")
 
-
 for expense in expenses:
     print(expense.get("description"), "- ₹", expense.get("amount"))
