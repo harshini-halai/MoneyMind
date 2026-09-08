@@ -11,5 +11,13 @@ while True:
 
     print("Expense added! 💸")
 
-    for expense in expenses:
-        print(expense.get("description"), "- ₹", expense.get("amount"))
+    choice = input("Aur kharcha? yes/no: ")
+
+    if choice == "no":
+        break
+
+print("\nYour Expenses:")
+
+
+for expense in expenses:
+    print(expense.get("description"), "- ₹", expense.get("amount"))
