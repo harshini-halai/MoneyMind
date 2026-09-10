@@ -128,6 +128,95 @@ def category_totals():
     for category, total in category_totals.items():
         print(category, "- ₹", total)
 
+def view_expenses_by_category():
+
+    while True:
+        print("\nSelect Category:")
+        print("1. Food")
+        print("2. Travel")
+        print("3. Shopping")
+        print("4. Bills")
+        print("5. Other")
+
+        category_choice = input("Enter category choice: ")
+
+        if category_choice == "1":
+            selected_category = "Food"
+            break
+
+        elif category_choice == "2":
+            selected_category = "Travel"
+            break
+
+        elif category_choice == "3":
+            selected_category = "Shopping"
+            break
+
+        elif category_choice == "4":
+            selected_category = "Bills"
+            break
+
+        elif category_choice == "5":
+            selected_category = "Other"
+            break
+
+        else:
+            print("Enter a valid category choice")
+
+    print("\n", selected_category, "Expenses:")
+
+    total = 0
+    found = False
+
+    for expense in expenses:
+
+        if expense.get("category") == selected_category:
+            print(
+                expense.get("description"),
+                "- ₹",
+                expense.get("amount")
+            )
+
+            total = total + expense.get("amount")
+            found = True
+
+    if found == False:
+        print("No expenses found in this category")
+
+    print("Total", selected_category, "Spending: ₹", total)
+
+def category_percentages():
+
+    total_spending = 0
+
+    # Calculate total spending
+    for expense in expenses:
+        total_spending = total_spending + expense.get("amount")
+
+    if total_spending == 0:
+        print("\nNo expenses found")
+        return
+
+    # Calculate category-wise totals
+    category_totals = {}
+
+    for expense in expenses:
+        category = expense.get("category")
+        amount = expense.get("amount")
+
+        if category in category_totals:
+            category_totals[category] += amount
+        else:
+            category_totals[category] = amount
+
+    print("\nCategory Spending Percentage:")
+
+    for category, total in category_totals.items():
+        percentage = (total / total_spending) * 100
+
+        print(category, "- ₹", total, "-", round(percentage, 2), "%")
+
+
 while True:
 
     print("\n===== MoneyMind =====")
@@ -136,7 +225,9 @@ while True:
     print("3. View Expenses")
     print("4. View Balance")
     print("5. Category Totals")
-    print("6. Exit")
+    print("6. View Expenses by Category")
+    print("7. Category Spending Percentages")       
+    print("8. Exit")
 
     choice = input("Enter your choice: ")
 
@@ -156,6 +247,12 @@ while True:
         category_totals()
 
     elif choice == "6":
+        view_expenses_by_category()
+
+    elif choice == "7":
+        category_percentages()
+
+    elif choice == "8": 
         print("Thank you for using MoneyMind!")
         break
 
