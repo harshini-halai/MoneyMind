@@ -1,60 +1,163 @@
 expenses = []
+income = 0
 
 
 def add_expense():
-    description = input("Enter description: ")
-    amount = int(input("Enter amount: "))
 
-    expenses.append({
-        "description": description,
-        "amount": amount
-    })
+    while True:
 
-    print("Expense added")
+        description = input("Enter description: ")
 
+        # Category selection
+        while True:
+            print("\nSelect Category:")
+            print("1. Food")
+            print("2. Travel")
+            print("3. Shopping")
+            print("4. Bills")
+            print("5. Other")
+
+            category_choice = input("Enter category choice: ")
+
+            if category_choice == "1":
+                category = "Food"
+                break
+
+            elif category_choice == "2":
+                category = "Travel"
+                break
+
+            elif category_choice == "3":
+                category = "Shopping"
+                break
+
+            elif category_choice == "4":
+                category = "Bills"
+                break
+
+            elif category_choice == "5":
+                category = "Other"
+                break
+
+            else:
+                print("Enter a valid category choice")
+
+        # Amount validation
+        while True:
+            try:
+                amount = int(input("Enter amount: "))
+
+                if amount > 0:
+                    break
+                else:
+                    print("Amount should be positive")
+
+            except ValueError:
+                print("Please enter a valid number")
+
+        expenses.append({
+            "description": description,
+            "category": category,
+            "amount": amount
+        })
+
+        print("Expense added")
+
+        # Add another expense
+        while True:
+            choice = input("Add another expense? yes/no: ").lower()
+
+            if choice == "yes":
+                break
+
+            elif choice == "no":
+                return
+
+            else:
+                print("Enter valid choice: yes or no")
 
 def add_income():
-    income = int(input("Enter your income: "))
-    return income
+    global income
 
+    amount = int(input("Enter income: "))
+    income = income + amount
+
+    print("Income added")
+
+
+def view_expenses():
+    print("\nYour Expenses:")
+
+    if len(expenses) == 0:
+        print("No expenses found")
+    else:
+        for expense in expenses:
+            print(
+                expense.get("description"),
+                "-",
+                expense.get("category"),
+                "- ₹",
+                expense.get("amount")
+            )
+
+def view_balance():
+    total = 0
+
+    for expense in expenses:
+        total = total + expense.get("amount")
+
+    balance = income - total
+
+    print("\nIncome: ₹", income)
+    print("Total Spending: ₹", total)
+    print("Balance: ₹", balance)
+
+def category_totals():
+    category_totals = {}
+
+    for expense in expenses:
+        category = expense.get("category")
+        amount = expense.get("amount")
+
+        if category in category_totals:
+            category_totals[category] += amount
+        else:
+            category_totals[category] = amount
+
+    print("\nCategory Totals:")
+    for category, total in category_totals.items():
+        print(category, "- ₹", total)
 
 while True:
 
-    add_expense()
+    print("\n===== MoneyMind =====")
+    print("1. Add Income")
+    print("2. Add Expense")
+    print("3. View Expenses")
+    print("4. View Balance")
+    print("5. Category Totals")
+    print("6. Exit")
 
-    while True:
-        choice = input("Aur kharcha? yes/no: ").lower()
+    choice = input("Enter your choice: ")
 
-        if choice == "yes":
-            break
+    if choice == "1":
+        add_income()
 
-        elif choice == "no":
-            break
+    elif choice == "2":
+        add_expense()
 
-        else:
-            print("Enter valid choice: yes or no")
+    elif choice == "3":
+        view_expenses()
 
-    if choice == "no":
+    elif choice == "4":
+        view_balance()
+
+    elif choice == "5":
+        category_totals()
+
+    elif choice == "6":
+        print("Thank you for using MoneyMind!")
         break
 
-
-print("\nYour Expenses:")
-
-for expense in expenses:
-    print(expense.get("description"), "- ₹", expense.get("amount"))
-
-
-total = 0
-
-for expense in expenses:
-    total = total + expense.get("amount")
-
-print("\nTotal Spending: ₹", total)
-
-
-income = add_income()
-
-balance = income - total
-
-print("Income: ₹", income)
-print("Balance: ₹", balance)
+    else:
+        print("Enter a valid choice")
