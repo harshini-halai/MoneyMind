@@ -1,3 +1,5 @@
+from datetime import datetime
+
 expenses = []
 income = 0
 
@@ -58,7 +60,8 @@ def add_expense():
         expenses.append({
             "description": description,
             "category": category,
-            "amount": amount
+            "amount": amount,
+            "date": datetime.now().strftime("%Y-%m-%d")
         })
 
         print("Expense added")
@@ -76,20 +79,34 @@ def add_expense():
             else:
                 print("Enter valid choice: yes or no")
 
+
 def add_income():
     global income
 
-    amount = int(input("Enter income: "))
+    while True:
+        try:
+            amount = int(input("Enter income: "))
+
+            if amount > 0:
+                break
+            else:
+                print("Income should be positive")
+
+        except ValueError:
+            print("Please enter a valid number")
+
     income = income + amount
 
     print("Income added")
 
 
 def view_expenses():
+
     print("\nYour Expenses:")
 
     if len(expenses) == 0:
         print("No expenses found")
+
     else:
         for expense in expenses:
             print(
@@ -97,10 +114,14 @@ def view_expenses():
                 "-",
                 expense.get("category"),
                 "- ₹",
-                expense.get("amount")
+                expense.get("amount"),
+                "-",
+                expense.get("date")
             )
 
+
 def view_balance():
+
     total = 0
 
     for expense in expenses:
@@ -112,7 +133,9 @@ def view_balance():
     print("Total Spending: ₹", total)
     print("Balance: ₹", balance)
 
+
 def category_totals():
+
     category_totals = {}
 
     for expense in expenses:
@@ -125,8 +148,10 @@ def category_totals():
             category_totals[category] = amount
 
     print("\nCategory Totals:")
+
     for category, total in category_totals.items():
         print(category, "- ₹", total)
+
 
 def view_expenses_by_category():
 
@@ -171,10 +196,13 @@ def view_expenses_by_category():
     for expense in expenses:
 
         if expense.get("category") == selected_category:
+
             print(
                 expense.get("description"),
                 "- ₹",
-                expense.get("amount")
+                expense.get("amount"),
+                "-",
+                expense.get("date")
             )
 
             total = total + expense.get("amount")
@@ -184,6 +212,7 @@ def view_expenses_by_category():
         print("No expenses found in this category")
 
     print("Total", selected_category, "Spending: ₹", total)
+
 
 def category_percentages():
 
@@ -214,8 +243,47 @@ def category_percentages():
     for category, total in category_totals.items():
         percentage = (total / total_spending) * 100
 
-        print(category, "- ₹", total, "-", round(percentage, 2), "%")
+        print(
+            category,
+            "- ₹",
+            total,
+            "-",
+            round(percentage, 2),
+            "%"
+        )
 
+
+def view_expenses_by_date():
+
+    selected_date = input("Enter date (YYYY-MM-DD): ")
+
+    print("\nExpenses on", selected_date, ":")
+
+    total = 0
+    found = False
+
+    for expense in expenses:
+
+        if expense.get("date") == selected_date:
+
+            print(
+                expense.get("description"),
+                "-",
+                expense.get("category"),
+                "- ₹",
+                expense.get("amount")
+            )
+
+            total = total + expense.get("amount")
+            found = True
+
+    if found == False:
+        print("No expenses found for this date")
+
+    print("Total Spending:", "₹", total)
+
+
+# Main Menu
 
 while True:
 
@@ -226,8 +294,9 @@ while True:
     print("4. View Balance")
     print("5. Category Totals")
     print("6. View Expenses by Category")
-    print("7. Category Spending Percentages")       
-    print("8. Exit")
+    print("7. Category Spending Percentage")
+    print("8. View Expenses by Date")
+    print("9. Exit")
 
     choice = input("Enter your choice: ")
 
@@ -252,7 +321,10 @@ while True:
     elif choice == "7":
         category_percentages()
 
-    elif choice == "8": 
+    elif choice == "8":
+        view_expenses_by_date()
+
+    elif choice == "9":
         print("Thank you for using MoneyMind!")
         break
 
