@@ -1,4 +1,5 @@
 from datetime import datetime
+from database import get_connection
 
 # Store all expenses
 expenses = []
@@ -67,6 +68,30 @@ def add_expense():
             "amount": amount,
             "date": datetime.now().strftime("%Y-%m-%d")
         })
+
+        # Save expense to MySQL
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        INSERT INTO transactions
+        (description, category, amount, date, type)
+        VALUES (%s, %s, %s, %s, %s)
+        """
+
+        data = (
+            description,
+            category,
+            amount,
+            datetime.now().strftime("%Y-%m-%d"),
+            "expense"
+        )
+
+        cursor.execute(query, data)
+        connection.commit()
+
+        cursor.close()
+        connection.close()
 
         print("Expense added")
 
