@@ -1,3 +1,4 @@
+from datetime import datetime
 from expense import (
     add_expense,
     view_expenses,
@@ -11,11 +12,13 @@ from analysis import (
     category_percentages
 )
 
+from database import get_connection
 
-# Store all expenses
+
+# Store all expenses temporarily
 expenses = []
 
-# Store total income
+# Store total income temporarily
 income = 0
 
 
@@ -38,6 +41,33 @@ def add_income():
 
     # Update income
     income = income + amount
+
+    # Get current date
+    transaction_date = datetime.now().strftime("%Y-%m-%d")
+
+    # Save income to MySQL
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    query = """
+    INSERT INTO transactions
+    (description, category, amount, date, type)
+    VALUES (%s, %s, %s, %s, %s)
+    """
+
+    data = (
+        "Income",
+        "Income",
+        amount,
+        transaction_date,
+        "income"
+    )
+
+    cursor.execute(query, data)
+    connection.commit()
+
+    cursor.close()
+    connection.close()
 
     print("Income added")
 

@@ -1,14 +1,8 @@
 from datetime import datetime
 from database import get_connection
 
-# Store all expenses
-expenses = []
 
-# Store total income
-income = 0
-
-
-def add_expense():
+def add_expense(expenses):
 
     while True:
 
@@ -61,12 +55,15 @@ def add_expense():
             except ValueError:
                 print("Please enter a valid number")
 
-        # Save expense
+        # Get current date
+        transaction_date = datetime.now().strftime("%Y-%m-%d")
+
+        # Save expense temporarily in Python list
         expenses.append({
             "description": description,
             "category": category,
             "amount": amount,
-            "date": datetime.now().strftime("%Y-%m-%d")
+            "date": transaction_date
         })
 
         # Save expense to MySQL
@@ -83,7 +80,7 @@ def add_expense():
             description,
             category,
             amount,
-            datetime.now().strftime("%Y-%m-%d"),
+            transaction_date,
             "expense"
         )
 
@@ -97,7 +94,7 @@ def add_expense():
 
         # Add another expense
         while True:
-            choice = input("Add another expense? yes/no: ").lower()
+            choice = input("Aur kharcha? yes/no: ").lower()
 
             if choice == "yes":
                 break
@@ -109,29 +106,7 @@ def add_expense():
                 print("Enter valid choice: yes or no")
 
 
-def add_income():
-    global income
-
-    # Income validation
-    while True:
-        try:
-            amount = int(input("Enter income: "))
-
-            if amount > 0:
-                break
-            else:
-                print("Income should be positive")
-
-        except ValueError:
-            print("Please enter a valid number")
-
-    # Update income
-    income = income + amount
-
-    print("Income added")
-
-
-def view_expenses():
+def view_expenses(expenses):
 
     print("\nYour Expenses:")
 
@@ -139,7 +114,6 @@ def view_expenses():
         print("No expenses found")
 
     else:
-        # Display all expenses
         for expense in expenses:
             print(
                 expense.get("description"),
@@ -152,46 +126,8 @@ def view_expenses():
             )
 
 
-def view_balance():
+def view_expenses_by_category(expenses):
 
-    total = 0
-
-    # Calculate total spending
-    for expense in expenses:
-        total = total + expense.get("amount")
-
-    # Calculate remaining balance
-    balance = income - total
-
-    print("\nIncome: ₹", income)
-    print("Total Spending: ₹", total)
-    print("Balance: ₹", balance)
-
-
-def category_totals():
-
-    category_totals = {}
-
-    # Calculate category-wise spending
-    for expense in expenses:
-        category = expense.get("category")
-        amount = expense.get("amount")
-
-        if category in category_totals:
-            category_totals[category] += amount
-        else:
-            category_totals[category] = amount
-
-    print("\nCategory Totals:")
-
-    # Display category totals
-    for category, total in category_totals.items():
-        print(category, "- ₹", total)
-
-
-def view_expenses_by_category():
-
-    # Select category
     while True:
         print("\nSelect Category:")
         print("1. Food")
@@ -230,7 +166,6 @@ def view_expenses_by_category():
     total = 0
     found = False
 
-    # Find expenses of selected category
     for expense in expenses:
 
         if expense.get("category") == selected_category:
@@ -252,49 +187,8 @@ def view_expenses_by_category():
     print("Total", selected_category, "Spending: ₹", total)
 
 
-def category_percentages():
+def view_expenses_by_date(expenses):
 
-    total_spending = 0
-
-    # Calculate total spending
-    for expense in expenses:
-        total_spending = total_spending + expense.get("amount")
-
-    if total_spending == 0:
-        print("\nNo expenses found")
-        return
-
-    # Store category totals
-    category_totals = {}
-
-    for expense in expenses:
-        category = expense.get("category")
-        amount = expense.get("amount")
-
-        if category in category_totals:
-            category_totals[category] += amount
-        else:
-            category_totals[category] = amount
-
-    print("\nCategory Spending Percentage:")
-
-    # Calculate percentage
-    for category, total in category_totals.items():
-        percentage = (total / total_spending) * 100
-
-        print(
-            category,
-            "- ₹",
-            total,
-            "-",
-            round(percentage, 2),
-            "%"
-        )
-
-
-def view_expenses_by_date():
-
-    # Get date from user
     selected_date = input("Enter date (YYYY-MM-DD): ")
 
     print("\nExpenses on", selected_date, ":")
@@ -302,7 +196,6 @@ def view_expenses_by_date():
     total = 0
     found = False
 
-    # Find expenses of selected date
     for expense in expenses:
 
         if expense.get("date") == selected_date:
@@ -321,52 +214,4 @@ def view_expenses_by_date():
     if found == False:
         print("No expenses found for this date")
 
-    print("Total Spending:", "₹", total)
-
-
-# Main Menu
-while True:
-
-    print("\n===== MoneyMind =====")
-    print("1. Add Income")
-    print("2. Add Expense")
-    print("3. View Expenses")
-    print("4. View Balance")
-    print("5. Category Totals")
-    print("6. View Expenses by Category")
-    print("7. Category Spending Percentage")
-    print("8. View Expenses by Date")
-    print("9. Exit")
-
-    choice = input("Enter your choice: ")
-
-    if choice == "1":
-        add_income()
-
-    elif choice == "2":
-        add_expense()
-
-    elif choice == "3":
-        view_expenses()
-
-    elif choice == "4":
-        view_balance()
-
-    elif choice == "5":
-        category_totals()
-
-    elif choice == "6":
-        view_expenses_by_category()
-
-    elif choice == "7":
-        category_percentages()
-
-    elif choice == "8":
-        view_expenses_by_date()
-
-    elif choice == "9":
-        print("Thank you for using MoneyMind!")
-        break
-
-    else:
-        print("Enter a valid choice")
+    print("Total Spending: ₹", total)
