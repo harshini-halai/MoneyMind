@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from expense import (
     add_expense,
     view_expenses,
@@ -15,34 +16,25 @@ from analysis import (
 from database import get_connection
 
 
-# Store all expenses temporarily
-expenses = []
-
-# Store total income temporarily
-income = 0
-
-
 def add_income():
-
-    global income
 
     # Income validation
     while True:
+
         try:
+
             amount = int(input("Enter income: "))
 
             if amount > 0:
                 break
+
             else:
                 print("Income should be positive")
 
         except ValueError:
+
             print("Please enter a valid number")
 
-    # Update income
-    income = income + amount
-
-    # Get current date
     transaction_date = datetime.now().strftime("%Y-%m-%d")
 
     # Save income to MySQL
@@ -64,12 +56,13 @@ def add_income():
     )
 
     cursor.execute(query, data)
+
     connection.commit()
 
     cursor.close()
     connection.close()
 
-    print("Income added")
+    print("Income added successfully")
 
 
 # Main Menu
@@ -89,32 +82,43 @@ while True:
     choice = input("Enter your choice: ")
 
     if choice == "1":
+
         add_income()
 
     elif choice == "2":
-        add_expense(expenses)
+
+        add_expense()
 
     elif choice == "3":
-        view_expenses(expenses)
+
+        view_expenses()
 
     elif choice == "4":
-        view_balance(expenses, income)
+
+        view_balance()
 
     elif choice == "5":
-        category_totals(expenses)
+
+        category_totals()
 
     elif choice == "6":
-        view_expenses_by_category(expenses)
+
+        view_expenses_by_category()
 
     elif choice == "7":
-        category_percentages(expenses)
+
+        category_percentages()
 
     elif choice == "8":
-        view_expenses_by_date(expenses)
+
+        view_expenses_by_date()
 
     elif choice == "9":
+
         print("Thank you for using MoneyMind!")
+
         break
 
     else:
+
         print("Enter a valid choice")

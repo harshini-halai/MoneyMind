@@ -1,75 +1,131 @@
-def view_balance(expenses, income):
+from database import get_connection
 
-    total = 0
 
-    # Calculate total spending
-    for expense in expenses:
-        total = total + expense.get("amount")
+def view_balance():
 
-    # Calculate remaining balance
-    balance = income - total
+    connection = get_connection()
+    cursor = connection.cursor()
 
-    print("\nIncome: ₹", income)
-    print("Total Spending: ₹", total)
+    # Get total income
+    income_query = """
+    SELECT COALESCE(SUM(amount), 0)
+    FROM transactions
+    WHERE type = 'income'
+    """
+
+    cursor.execute(income_query)
+
+    total_income = cursor.fetchone()[0]
+
+    # Get total expenses
+    expense_query = """
+    SELECT COALESCE(SUM(amount), 0)
+    FROM transactions
+    WHERE type = 'expense'
+    """
+
+    cursor.execute(expense_query)
+
+    total_expenses = cursor.fetchone()[0]
+
+    balance = total_income - total_expenses
+
+    print("\nIncome: ₹", total_income)
+    print("Total Spending: ₹", total_expenses)
     print("Balance: ₹", balance)
 
+    cursor.close()
+    connection.close()
 
-def category_totals(expenses):
 
-    category_totals = {}
+def category_totals():
 
-    # Calculate category-wise spending
-    for expense in expenses:
-        category = expense.get("category")
-        amount = expense.get("amount")
+    connection = get_connection()
+    cursor = connection.cursor()
 
-        if category in category_totals:
-            category_totals[category] += amount
-        else:
-            category_totals[category] = amount
+    query = """
+    SELECT category, SUM(amount)
+    FROM transactions
+    WHERE type = 'expense'
+    GROUP BY category
+    """
+
+    cursor.execute(query)
+
+    categories = cursor.fetchall()
 
     print("\nCategory Totals:")
 
-    # Display category totals
-    for category, total in category_totals.items():
-        print(category, "- ₹", total)
+    if len(categories) == 0:
+
+        print("No expenses found")
+
+    else:
+
+        for category in categories:
+
+            print(
+                category[0],
+                "- ₹",
+                category[1]
+            )
+
+    cursor.close()
+    connection.close()
 
 
-def category_percentages(expenses):
+def category_percentages():
 
-    total_spending = 0
+    connection = get_connection()
+    cursor = connection.cursor()
 
-    # Calculate total spending
-    for expense in expenses:
-        total_spending = total_spending + expense.get("amount")
+    query = """
+    SELECT category, SUM(amount)
+    FROM transactions
+    WHERE type = 'expense'
+    GROUP BY category
+    """
 
-    if total_spending == 0:
+    cursor.execute(query)
+
+    categories = cursor.fetchall()
+
+    if len(categories) == 0:
+
         print("\nNo expenses found")
+
+        cursor.close()
+        connection.close()
+
         return
 
-    # Store category totals
-    category_totals = {}
+    total_query = """
+    SELECT COALESCE(SUM(amount), 0)
+    FROM transactions
+    WHERE type = 'expense'
+    """
 
-    for expense in expenses:
-        category = expense.get("category")
-        amount = expense.get("amount")
+    cursor.execute(total_query)
 
-        if category in category_totals:
-            category_totals[category] += amount
-        else:
-            category_totals[category] = amount
+    total_spending = cursor.fetchone()[0]
 
     print("\nCategory Spending Percentage:")
 
-    # Calculate percentage
-    for category, total in category_totals.items():
-        percentage = (total / total_spending) * 100
+    for category in categories:
+
+        category_name = category[0]
+        category_total = category[1]
+
+        percentage = (category_total / total_spending) * 100
 
         print(
-            category,
+            category_name,
             "- ₹",
-            total,
+            category_total,
             "-",
             round(percentage, 2),
             "%"
         )
+
+    cursor.close()
+    connection.close()

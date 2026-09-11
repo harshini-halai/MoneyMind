@@ -2,7 +2,7 @@ from datetime import datetime
 from database import get_connection
 
 
-def add_expense(expenses):
+def add_expense():
 
     while True:
 
@@ -10,6 +10,7 @@ def add_expense(expenses):
 
         # Category selection
         while True:
+
             print("\nSelect Category:")
             print("1. Food")
             print("2. Travel")
@@ -44,29 +45,22 @@ def add_expense(expenses):
 
         # Amount validation
         while True:
+
             try:
                 amount = int(input("Enter amount: "))
 
                 if amount > 0:
                     break
+
                 else:
                     print("Amount should be positive")
 
             except ValueError:
                 print("Please enter a valid number")
 
-        # Get current date
         transaction_date = datetime.now().strftime("%Y-%m-%d")
 
-        # Save expense temporarily in Python list
-        expenses.append({
-            "description": description,
-            "category": category,
-            "amount": amount,
-            "date": transaction_date
-        })
-
-        # Save expense to MySQL
+        # Connect to MySQL
         connection = get_connection()
         cursor = connection.cursor()
 
@@ -85,28 +79,35 @@ def add_expense(expenses):
         )
 
         cursor.execute(query, data)
+
         connection.commit()
 
         cursor.close()
         connection.close()
 
-        print("Expense added")
+        print("Expense added successfully")
 
-        # Add another expense
-        while True:
-            choice = input("Aur kharcha? yes/no: ").lower()
+        choice = input("Add another expense? yes/no: ").lower()
 
-            if choice == "yes":
-                break
-
-            elif choice == "no":
-                return
-
-            else:
-                print("Enter valid choice: yes or no")
+        if choice == "no":
+            return
 
 
-def view_expenses(expenses):
+def view_expenses():
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    query = """
+    SELECT description, category, amount, date
+    FROM transactions
+    WHERE type = 'expense'
+    ORDER BY date DESC
+    """
+
+    cursor.execute(query)
+
+    expenses = cursor.fetchall()
 
     print("\nYour Expenses:")
 
@@ -114,21 +115,27 @@ def view_expenses(expenses):
         print("No expenses found")
 
     else:
+
         for expense in expenses:
+
             print(
-                expense.get("description"),
+                expense[0],
                 "-",
-                expense.get("category"),
+                expense[1],
                 "- ₹",
-                expense.get("amount"),
+                expense[2],
                 "-",
-                expense.get("date")
+                expense[3]
             )
 
+    cursor.close()
+    connection.close()
 
-def view_expenses_by_category(expenses):
+
+def view_expenses_by_category():
 
     while True:
+
         print("\nSelect Category:")
         print("1. Food")
         print("2. Travel")
@@ -161,57 +168,90 @@ def view_expenses_by_category(expenses):
         else:
             print("Enter a valid category choice")
 
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    query = """
+    SELECT description, amount, date
+    FROM transactions
+    WHERE type = 'expense'
+    AND category = %s
+    ORDER BY date DESC
+    """
+
+    cursor.execute(query, (selected_category,))
+
+    expenses = cursor.fetchall()
+
     print("\n", selected_category, "Expenses:")
 
-    total = 0
-    found = False
+    if len(expenses) == 0:
 
-    for expense in expenses:
-
-        if expense.get("category") == selected_category:
-
-            print(
-                expense.get("description"),
-                "- ₹",
-                expense.get("amount"),
-                "-",
-                expense.get("date")
-            )
-
-            total = total + expense.get("amount")
-            found = True
-
-    if found == False:
         print("No expenses found in this category")
 
-    print("Total", selected_category, "Spending: ₹", total)
+    else:
+
+        total = 0
+
+        for expense in expenses:
+
+            print(
+                expense[0],
+                "- ₹",
+                expense[1],
+                "-",
+                expense[2]
+            )
+
+            total += expense[1]
+
+        print("Total", selected_category, "Spending: ₹", total)
+
+    cursor.close()
+    connection.close()
 
 
-def view_expenses_by_date(expenses):
+def view_expenses_by_date():
 
     selected_date = input("Enter date (YYYY-MM-DD): ")
 
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    query = """
+    SELECT description, category, amount
+    FROM transactions
+    WHERE type = 'expense'
+    AND date = %s
+    """
+
+    cursor.execute(query, (selected_date,))
+
+    expenses = cursor.fetchall()
+
     print("\nExpenses on", selected_date, ":")
 
-    total = 0
-    found = False
+    if len(expenses) == 0:
 
-    for expense in expenses:
-
-        if expense.get("date") == selected_date:
-
-            print(
-                expense.get("description"),
-                "-",
-                expense.get("category"),
-                "- ₹",
-                expense.get("amount")
-            )
-
-            total = total + expense.get("amount")
-            found = True
-
-    if found == False:
         print("No expenses found for this date")
 
-    print("Total Spending: ₹", total)
+    else:
+
+        total = 0
+
+        for expense in expenses:
+
+            print(
+                expense[0],
+                "-",
+                expense[1],
+                "- ₹",
+                expense[2]
+            )
+
+            total += expense[2]
+
+        print("Total Spending: ₹", total)
+
+    cursor.close()
+    connection.close()
