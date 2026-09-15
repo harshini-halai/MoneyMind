@@ -99,7 +99,7 @@ def view_expenses():
     cursor = connection.cursor()
 
     query = """
-    SELECT description, category, amount, date
+    SELECT id, description, category, amount, date
     FROM transactions
     WHERE type = 'expense'
     ORDER BY date DESC
@@ -118,18 +118,23 @@ def view_expenses():
 
         for expense in expenses:
 
-            print(
-                expense[0],
-                "-",
-                expense[1],
-                "- ₹",
-                expense[2],
-                "-",
-                expense[3]
-            )
+           print(
+        "ID:", expense[0],
+        "-",
+        expense[1],
+        "-",
+        expense[2],
+        "- ₹",
+        expense[3],
+        "-",
+        expense[4]
+    )
 
     cursor.close()
     connection.close()
+
+def update_transaction():
+    pass
 
 
 def view_expenses_by_category():
