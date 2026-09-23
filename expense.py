@@ -137,6 +137,20 @@ def update_transaction():
 
     transaction_id = input("Enter transaction ID to update: ")
 
+    while True:
+
+        try:
+            transaction_id = int(input("Enter transaction ID to update: "))
+
+            if transaction_id > 0:
+                break
+
+            else:
+                print("ID should be positive")
+
+        except ValueError:
+            print("Please enter a valid transaction ID")
+
     new_description = input("Enter new description: ")
 
     # Category selection
@@ -223,7 +237,19 @@ def update_transaction():
 
 def delete_transaction():
 
-    transaction_id = input("Enter transaction ID to delete: ")
+    while True:
+
+        try:
+            transaction_id = int(input("Enter transaction ID to delete: "))
+
+            if transaction_id > 0:
+                break
+
+            else:
+                print("ID should be positive")
+
+        except ValueError:
+            print("Please enter a valid transaction ID")
 
     connection = get_connection()
     cursor = connection.cursor()
@@ -243,6 +269,9 @@ def delete_transaction():
 
     else:
         print("Transaction deleted successfully")
+
+    cursor.close()
+    connection.close()
 
     cursor.close()
     connection.close()
