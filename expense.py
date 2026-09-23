@@ -134,7 +134,92 @@ def view_expenses():
     connection.close()
 
 def update_transaction():
-    pass
+
+    transaction_id = input("Enter transaction ID to update: ")
+
+    new_description = input("Enter new description: ")
+
+    # Category selection
+    while True:
+
+        print("\nSelect Category:")
+        print("1. Food")
+        print("2. Travel")
+        print("3. Shopping")
+        print("4. Bills")
+        print("5. Other")
+
+        category_choice = input("Enter category choice: ")
+
+        if category_choice == "1":
+            category = "Food"
+            break
+
+        elif category_choice == "2":
+            category = "Travel"
+            break
+
+        elif category_choice == "3":
+            category = "Shopping"
+            break
+
+        elif category_choice == "4":
+            category = "Bills"
+            break
+
+        elif category_choice == "5":
+            category = "Other"
+            break
+
+        else:
+            print("Enter a valid category choice")
+
+    # Amount validation
+    while True:
+
+        try:
+            new_amount = int(input("Enter new amount: "))
+
+            if new_amount > 0:
+                break
+
+            else:
+                print("Amount should be positive")
+
+        except ValueError:
+            print("Please enter a valid number")
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    query = """
+    UPDATE transactions
+    SET description = %s,
+        category = %s,
+        amount = %s
+    WHERE id = %s
+    AND type = 'expense'
+    """
+
+    data = (
+        new_description,
+        category,
+        new_amount,
+        transaction_id
+    )
+
+    cursor.execute(query, data)
+
+    connection.commit()
+
+    if cursor.rowcount == 0:
+        print("Transaction not found")
+
+    else:
+        print("Transaction updated successfully")
+
+    cursor.close()
+    connection.close()
 
 
 def view_expenses_by_category():
