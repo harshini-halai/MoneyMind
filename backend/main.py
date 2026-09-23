@@ -84,6 +84,55 @@ def create_transaction(transaction: Transaction):
         "message": "Transaction added successfully"
     }
 
+@app.get("/balance")
+def get_balance():
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT
+            SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS total_income,
+            SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS total_expenses
+        FROM transactions
+    """)
+
+    result = cursor.fetchone()
+
+    cursor.close()
+    connection.close()
+
+    total_income = result[0] or 0
+    total_expenses = result[1] or 0
+    balance = total_income - total_expenses
+
+    return {
+        "total_income": total_income,
+        "total_expenses": total_expenses,
+        "balance": balance
+    }
+
+@app.get("/categories")
+def get_categories():
+
+    connection = get_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    query = """
+    SELECT category, SUM(amount) AS total
+    FROM transactions
+    WHERE type = 'expense'
+    GROUP BY category
+    """
+
+    cursor.execute(query)
+
+    categories = cursor.fetchall()
+
+    cursor.close()
+    connection.close()
+
+    return categories
 
 def add_income():
 
