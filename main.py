@@ -4,7 +4,8 @@ from expense import (
     add_expense,
     view_expenses,
     view_expenses_by_category,
-    view_expenses_by_date
+    view_expenses_by_date,
+    delete_transaction
 )
 
 from analysis import (
@@ -77,7 +78,8 @@ while True:
     print("6. View Expenses by Category")
     print("7. Category Spending Percentage")
     print("8. View Expenses by Date")
-    print("9. Exit")
+    print("9. Delete Transaction")
+    print("10. Exit")
 
     choice = input("Enter your choice: ")
 
@@ -114,6 +116,10 @@ while True:
         view_expenses_by_date()
 
     elif choice == "9":
+
+        delete_transaction()    
+
+    elif choice == "10":
 
         print("Thank you for using MoneyMind!")
 

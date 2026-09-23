@@ -221,6 +221,31 @@ def update_transaction():
     cursor.close()
     connection.close()
 
+def delete_transaction():
+
+    transaction_id = input("Enter transaction ID to delete: ")
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    query = """
+    DELETE FROM transactions
+    WHERE id = %s
+    AND type = 'expense'
+    """
+
+    cursor.execute(query, (transaction_id,))
+
+    connection.commit()
+
+    if cursor.rowcount == 0:
+        print("Transaction not found")
+
+    else:
+        print("Transaction deleted successfully")
+
+    cursor.close()
+    connection.close()
 
 def view_expenses_by_category():
 
