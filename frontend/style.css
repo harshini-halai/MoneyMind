@@ -1,76 +1,189 @@
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-    font-family: Arial, sans-serif;
-    background: #f5f7fa;
-    color: #222;
+  font-family: Arial, sans-serif;
+  background: #eef4f8;
+  color: #1f2937;
 }
 
-header {
-    padding: 25px 40px;
-    background: white;
-    border-bottom: 1px solid #ddd;
+/* Header */
+
+.header {
+  background: #17324d;
+  color: white;
+  padding: 25px 40px;
+  border-bottom: 1px solid #17324d;
 }
 
-header h1 {
-    margin-bottom: 5px;
+.header p {
+  color: #cbd8e3;
 }
 
-main {
-    padding: 30px 40px;
+/* Main Dashboard */
+
+.dashboard {
+  max-width: 1200px;
+  margin: auto;
+  padding: 30px 40px;
 }
 
 section {
-    margin-bottom: 30px;
+  margin-bottom: 30px;
 }
 
-section h2 {
-    margin-bottom: 15px;
+/* Section Headings */
+
+.section-heading {
+  margin-bottom: 15px;
 }
 
-section:first-child {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 15px;
+.section-heading h2 {
+  margin-bottom: 5px;
 }
 
-section:first-child h2 {
-    grid-column: 1 / -1;
+.section-heading p {
+  color: #777;
+  font-size: 14px;
 }
 
-section:first-child div {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    border: 1px solid #ddd;
+/* Financial Overview */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
 }
 
-section:first-child div p {
-    font-size: 24px;
-    font-weight: bold;
-    margin-top: 10px;
+.summary-card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  border: 1px solid #d8e2ea;
+  border-top: 4px solid #2f80ed;
+}
+.summary-card h3 {
+  font-size: 15px;
+  color: #666;
+  font-weight: normal;
+}
+
+.summary-card .amount {
+  font-size: 24px;
+  font-weight: bold;
+  margin-top: 10px;
+  color: #17324d;
+}
+
+/* Quick Actions */
+
+.quick-actions,
+.transactions-section,
+.goals-section,
+.khata-section {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
 }
 
 button {
-    padding: 10px 18px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    margin-right: 10px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
 }
 
-section:not(:first-child) {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    border: 1px solid #ddd;
+.primary-button {
+  background: #2f80ed;
+  color: white;
 }
+
+.secondary-button {
+  background: #dff3e7;
+  color: #176b3a;
+}
+
+/* Empty States */
+
+.empty-state {
+  color: #777;
+  padding: 10px 0;
+}
+
+/* Khata */
+
+.khata-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.khata-content p {
+  color: #666;
+  margin-top: 8px;
+  max-width: 600px;
+}
+
+.khata-section {
+  background: #e8f1ff;
+  border: 1px solid #c8ddf5;
+}
+
+.khata-button {
+  background: #17324d;
+  color: white;
+}
+
+/* Footer */
 
 footer {
-    padding: 20px 40px;
-    text-align: center;
+  padding: 20px 40px;
+  text-align: center;
+  color: #777;
+}
+
+/* Responsive */
+
+@media (max-width: 800px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dashboard {
+    padding: 25px 20px;
+  }
+
+  .header {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 500px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .khata-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  button {
+    width: 100%;
+  }
 }

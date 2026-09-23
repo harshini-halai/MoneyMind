@@ -1,78 +1,109 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MoneyMind</title>
-    <link rel="stylesheet" href="style.css">
-</head>
 
-<body>
+    <link rel="stylesheet" href="style.css" />
+  </head>
 
-    <header>
+  <body>
+    <header class="header">
+      <div class="header-content">
         <h1>MoneyMind</h1>
         <p>Manage Money, Build Savings</p>
+      </div>
     </header>
 
-    <main>
+    <main class="dashboard">
+      <!-- Financial Overview -->
+      <section class="financial-overview">
+        <div class="section-heading">
+          <h2>Financial Overview</h2>
+          <p>Your money at a glance</p>
+        </div>
 
-        <section>
-            <h2>Financial Overview</h2>
+        <div class="summary-grid">
+          <div class="summary-card">
+            <h3>Balance</h3>
+            <p class="amount">₹0</p>
+          </div>
 
-            <div>
-                <h3>Balance</h3>
-                <p>₹0</p>
-            </div>
+          <div class="summary-card">
+            <h3>Total Income</h3>
+            <p class="amount">₹0</p>
+          </div>
 
-            <div>
-                <h3>Total Income</h3>
-                <p>₹0</p>
-            </div>
+          <div class="summary-card">
+            <h3>Total Expenses</h3>
+            <p class="amount">₹0</p>
+          </div>
 
-            <div>
-                <h3>Total Expenses</h3>
-                <p>₹0</p>
-            </div>
+          <div class="summary-card">
+            <h3>Protected Savings</h3>
+            <p class="amount">₹0</p>
+          </div>
+        </div>
+      </section>
 
-            <div>
-                <h3>Protected Savings</h3>
-                <p>₹0</p>
-            </div>
-        </section>
+      <!-- Quick Actions -->
+      <section class="quick-actions">
+        <div class="section-heading">
+          <h2>Quick Actions</h2>
+          <p>Manage your money</p>
+        </div>
 
-        <section>
-            <h2>Quick Actions</h2>
+        <div class="action-buttons">
+          <button class="primary-button">Add Income</button>
+          <button class="secondary-button">Add Expense</button>
+        </div>
+      </section>
 
-            <button>Add Income</button>
-            <button>Add Expense</button>
-        </section>
+      <!-- Recent Transactions -->
+      <section class="transactions-section">
+        <div class="section-heading">
+          <h2>Recent Transactions</h2>
+          <p>Your latest income and expenses</p>
+        </div>
 
-        <section>
-            <h2>Recent Transactions</h2>
+        <div class="transactions-list">
+          <p class="empty-state">No transactions yet.</p>
+        </div>
+      </section>
 
-            <p>No transactions yet.</p>
-        </section>
+      <!-- Savings Goals -->
+      <section class="goals-section">
+        <div class="section-heading">
+          <h2>Savings Goals</h2>
+          <p>Track what you're saving for</p>
+        </div>
 
-        <section>
-            <h2>Savings Goals</h2>
+        <div class="goals-list">
+          <p class="empty-state">No savings goals added yet.</p>
+        </div>
+      </section>
 
-            <p>No savings goals added yet.</p>
-        </section>
-
-        <section>
+      <!-- Khata -->
+      <section class="khata-section">
+        <div class="khata-content">
+          <div>
             <h2>Khata</h2>
 
-            <p>Your financial intelligence assistant will appear here.</p>
-            <button>Ask Khata</button>
-        </section>
+            <p>
+              Your financial intelligence assistant will help you understand and
+              improve your money decisions.
+            </p>
+          </div>
 
+          <button class="khata-button">Ask Khata</button>
+        </div>
+      </section>
     </main>
 
     <footer>
-        <p>MoneyMind</p>
+      <p>MoneyMind</p>
     </footer>
-
-</body>
-
+  </body>
 </html>
