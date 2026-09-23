@@ -1,3 +1,13 @@
 {
-  "cSpell.words": ["Khata"]
+  "cSpell.words": [
+    "dotenv",
+    "fastapi",
+    "Khata",
+    "mysql-connector-python",
+    "numpy",
+    "pycache",
+    "pydantic",
+    "scikit",
+    "uvicorn"
+  ]
 }
