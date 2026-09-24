@@ -1,16 +1,17 @@
-
+from typing import Literal
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from backend.database import get_connection
-
+from datetime import date
 
 app = FastAPI()
+
 class Transaction(BaseModel):
     description: str
-    category: str
-    amount: float
-    date: str
-    type: str
+    category: Literal["Food", "Travel", "Shopping", "Bills", "Other"]
+    amount: float = Field(gt=0)
+    date: date
+    type: Literal["income", "expense"]
 
 @app.get("/")
 def home():
