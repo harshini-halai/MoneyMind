@@ -110,6 +110,98 @@ def create_transaction(transaction: Transaction):
             detail="Unable to add transaction"
         )
 
+@app.put("/transactions/{transaction_id}")
+def update_transaction(transaction_id: int, transaction: Transaction):
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        UPDATE transactions
+        SET description = %s,
+            category = %s,
+            amount = %s,
+            date = %s,
+            type = %s
+        WHERE id = %s
+        """
+
+        data = (
+            transaction.description,
+            transaction.category,
+            transaction.amount,
+            transaction.date,
+            transaction.type,
+            transaction_id
+        )
+
+        cursor.execute(query, data)
+        connection.commit()
+
+        if cursor.rowcount == 0:
+            cursor.close()
+            connection.close()
+            raise HTTPException(
+                status_code=404,
+                detail="Transaction not found"
+            )
+
+        cursor.close()
+        connection.close()
+
+        return {
+            "message": "Transaction updated successfully"
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to update transaction"
+        )
+
+
+@app.delete("/transactions/{transaction_id}")
+def delete_transaction(transaction_id: int):
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        DELETE FROM transactions
+        WHERE id = %s
+        """
+
+        cursor.execute(query, (transaction_id,))
+        connection.commit()
+
+        if cursor.rowcount == 0:
+            cursor.close()
+            connection.close()
+            raise HTTPException(
+                status_code=404,
+                detail="Transaction not found"
+            )
+
+        cursor.close()
+        connection.close()
+
+        return {
+            "message": "Transaction deleted successfully"
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to delete transaction"
+        )
 
 @app.get("/balance")
 def get_balance():
