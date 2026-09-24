@@ -1,0 +1,66 @@
+<!doctype html>
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Add Expense - MoneyMind</title>
+
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <h1>MoneyMind</h1>
+        <p>Add Expense</p>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="transaction-form-section">
+        <div class="section-heading">
+          <h2>Add Expense</h2>
+          <p>Record money you spent</p>
+        </div>
+
+        <form id="expense-form">
+          <input
+            type="text"
+            id="expense-description"
+            placeholder="Description"
+            required
+          />
+
+          <select id="expense-category" required>
+            <option value="">Select Category</option>
+            <option value="Food">Food</option>
+            <option value="Travel">Travel</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Bills">Bills</option>
+            <option value="Other">Other</option>
+          </select>
+
+          <input
+            type="number"
+            id="expense-amount"
+            placeholder="Amount"
+            min="1"
+            required
+          />
+
+          <input type="date" id="expense-date" required />
+
+          <button type="submit" class="secondary-button">Save Expense</button>
+
+          <a href="/" class="primary-button"> Cancel </a>
+        </form>
+
+        <p id="expense-message"></p>
+      </section>
+    </main>
+
+    <script src="/frontend/js/transaction.js"></script>
+  </body>
+</html>

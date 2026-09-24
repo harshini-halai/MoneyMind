@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>MoneyMind</title>
+
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <h1>MoneyMind</h1>
+        <p>Manage Money, Build Savings</p>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <!-- Financial Overview -->
+      <section class="financial-overview">
+        <div class="section-heading">
+          <h2>Financial Overview</h2>
+          <p>Your money at a glance</p>
+        </div>
+
+        <div class="summary-grid">
+          <div class="summary-card">
+            <h3>Balance</h3>
+            <p class="amount" id="balance">₹0</p>
+          </div>
+
+          <div class="summary-card">
+            <h3>Total Income</h3>
+            <p class="amount" id="total-income">₹0</p>
+          </div>
+
+          <div class="summary-card">
+            <h3>Total Expenses</h3>
+            <p class="amount" id="total-expenses">₹0</p>
+          </div>
+
+          <div class="summary-card">
+            <h3>Protected Savings</h3>
+            <p class="amount">₹0</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quick Actions -->
+      <section class="quick-actions">
+        <div class="section-heading">
+          <h2>Quick Actions</h2>
+          <p>Manage your money</p>
+        </div>
+
+        <div class="action-buttons">
+          <a href="/add-income" class="primary-button">Add Income</a>
+          <a href="/add-expense" class="secondary-button">Add Expense</a>
+        </div>
+      </section>
+
+      <!-- Recent Transactions -->
+      <section class="transactions-section">
+        <div class="section-heading">
+          <h2>Recent Transactions</h2>
+          <p>Your latest income and expenses</p>
+        </div>
+
+        <div class="transactions-list">
+          <p class="empty-state">No transactions yet.</p>
+        </div>
+      </section>
+
+      <!-- Savings Goals -->
+      <section class="goals-section">
+        <div class="section-heading">
+          <h2>Savings Goals</h2>
+          <p>Track what you're saving for</p>
+        </div>
+
+        <div class="goals-list">
+          <p class="empty-state">No savings goals added yet.</p>
+        </div>
+      </section>
+
+      <!-- Khata -->
+      <section class="khata-section">
+        <div class="khata-content">
+          <div>
+            <h2>Khata</h2>
+
+            <p>
+              Your financial intelligence assistant will help you understand and
+              improve your money decisions.
+            </p>
+          </div>
+
+          <button class="khata-button">Ask Khata</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>MoneyMind</p>
+    </footer>
+
+    <script src="/frontend/js/script.js"></script>
+
+  </body>
+</html>

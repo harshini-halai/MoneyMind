@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Add Income - MoneyMind</title>
+
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <h1>MoneyMind</h1>
+        <p>Add Income</p>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="transaction-form-section">
+        <div class="section-heading">
+          <h2>Add Income</h2>
+          <p>Record money you received</p>
+        </div>
+
+        <form id="income-form">
+          <input
+            type="text"
+            id="income-description"
+            placeholder="Description"
+            required
+          />
+
+          <input
+            type="number"
+            id="income-amount"
+            placeholder="Amount"
+            min="1"
+            required
+          />
+
+          <input
+            type="date"
+            id="income-date"
+            required
+          />
+
+          <button type="submit" class="primary-button">
+            Save Income
+          </button>
+
+          <a href="/" class="secondary-button">
+            Cancel
+          </a>
+        </form>
+
+        <p id="income-message"></p>
+      </section>
+    </main>
+
+    <script src="/frontend/js/transaction.js"></script>
+  </body>
+</html>
+```

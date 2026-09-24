@@ -1,10 +1,25 @@
 from typing import Literal
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from backend.database import get_connection
 from datetime import date
 
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+
 
 class Transaction(BaseModel):
     description: str
@@ -13,9 +28,21 @@ class Transaction(BaseModel):
     date: date
     type: Literal["income", "expense"]
 
+
 @app.get("/")
 def home():
-    return {"message": "MoneyMind API is running"}
+    return FileResponse("frontend/templates/index.html")
+
+
+@app.get("/add-income")
+def add_income_page():
+    return FileResponse("frontend/templates/add-income.html")
+
+
+@app.get("/add-expense")
+def add_expense_page():
+    return FileResponse("frontend/templates/add-expense.html")
+
 
 @app.get("/transactions")
 def get_transactions():
@@ -44,6 +71,7 @@ def get_transactions():
             status_code=500,
             detail="Unable to fetch transactions"
         )
+
 
 @app.post("/transactions")
 def create_transaction(transaction: Transaction):
@@ -82,6 +110,7 @@ def create_transaction(transaction: Transaction):
             detail="Unable to add transaction"
         )
 
+
 @app.get("/balance")
 def get_balance():
 
@@ -115,7 +144,8 @@ def get_balance():
             status_code=500,
             detail="Unable to fetch balance"
         )
-    
+
+
 @app.get("/categories")
 def get_categories():
 
@@ -144,6 +174,3 @@ def get_categories():
             status_code=500,
             detail="Unable to fetch category totals"
         )
-
-
-
