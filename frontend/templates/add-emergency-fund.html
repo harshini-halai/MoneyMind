@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Emergency Fund - MoneyMind</title>
+
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <h1>MoneyMind</h1>
+        <p>Emergency Fund</p>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="transaction-form-section">
+        <div class="section-heading">
+          <h2>Add Emergency Fund</h2>
+          <p>Keep money protected for unexpected expenses</p>
+        </div>
+
+        <form id="emergency-fund-form">
+          <input
+            type="number"
+            id="emergency-fund-amount"
+            placeholder="Amount"
+            min="1"
+            required
+          />
+
+          <input
+            type="text"
+            id="emergency-fund-description"
+            placeholder="Description"
+            required
+          />
+
+          <input type="date" id="emergency-fund-date" required />
+
+          <button type="submit" class="primary-button">
+            Save Emergency Fund
+          </button>
+
+          <a href="/" class="secondary-button"> Cancel </a>
+        </form>
+
+        <p id="emergency-fund-message"></p>
+      </section>
+    </main>
+
+    <script src="/frontend/js/emergency-fund.js"></script>
+  </body>
+</html>

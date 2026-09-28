@@ -51,6 +51,10 @@ def transactions_page():
 def add_savings_page():
     return FileResponse("frontend/templates/add-savings.html")
 
+@app.get("/add-emergency-fund")
+def add_emergency_fund_page():
+    return FileResponse("frontend/templates/add-emergency-fund.html")
+
 @app.get("/transactions")
 def get_transactions():
 
@@ -152,6 +156,41 @@ def create_saving(saving: Saving):
             status_code=500,
             detail="Unable to add saving"
         )
+class EmergencyFund(BaseModel):
+    amount: float = Field(gt=0)
+    description: str
+    date: date
+
+@app.post("/emergency-fund")
+def create_emergency_fund(fund: EmergencyFund):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        INSERT INTO emergency_fund (amount, description, date)
+        VALUES (%s, %s, %s)
+        """
+
+        data = (
+            fund.amount,
+            fund.description,
+            fund.date
+        )
+
+        cursor.execute(query, data)
+        connection.commit()
+
+        cursor.close()
+        connection.close()
+
+        return {"message": "Emergency fund added successfully"}
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to add emergency fund"
+        )
 
 @app.get("/savings")
 def get_savings():
@@ -177,6 +216,31 @@ def get_savings():
         raise HTTPException(
             status_code=500,
             detail="Unable to fetch savings"
+        )
+@app.get("/emergency-fund")
+def get_emergency_fund():
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        query = """
+        SELECT id, amount, description, date
+        FROM emergency_fund
+        ORDER BY id DESC
+        """
+
+        cursor.execute(query)
+        funds = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+
+        return funds
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to fetch emergency fund"
         )
 
 @app.get("/savings/total")
@@ -208,6 +272,35 @@ def get_total_savings():
             detail="Unable to fetch total savings"
         )
     
+@app.get("/emergency-fund/total")
+def get_total_emergency_fund():
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        SELECT SUM(amount)
+        FROM emergency_fund
+        """
+
+        cursor.execute(query)
+        result = cursor.fetchone()
+
+        cursor.close()
+        connection.close()
+
+        total_fund = result[0] or 0
+
+        return {
+            "emergency_fund": total_fund
+        }
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to fetch total emergency fund"
+        )
+
 @app.put("/transactions/{transaction_id}")
 def update_transaction(transaction_id: int, transaction: Transaction):
 
