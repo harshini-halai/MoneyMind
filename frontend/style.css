@@ -8,6 +8,7 @@ body {
   font-family: Arial, sans-serif;
   background: #eef4f8;
   color: #1f2937;
+  line-height: 1.5;
 }
 
 /* Header */
@@ -15,12 +16,23 @@ body {
 .header {
   background: #17324d;
   color: white;
-  padding: 25px 40px;
+  padding: 28px 40px;
   border-bottom: 1px solid #17324d;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: auto;
+}
+
+.header h1 {
+  font-size: 30px;
+  margin-bottom: 4px;
 }
 
 .header p {
   color: #cbd8e3;
+  font-size: 15px;
 }
 
 /* Main Dashboard */
@@ -28,7 +40,7 @@ body {
 .dashboard {
   max-width: 1200px;
   margin: auto;
-  padding: 30px 40px;
+  padding: 35px 40px;
 }
 
 section {
@@ -38,10 +50,11 @@ section {
 /* Section Headings */
 
 .section-heading {
-  margin-bottom: 15px;
+  margin-bottom: 18px;
 }
 
 .section-heading h2 {
+  font-size: 21px;
   margin-bottom: 5px;
 }
 
@@ -55,52 +68,64 @@ section {
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px;
+  gap: 18px;
 }
 
 .summary-card {
   background: white;
-  padding: 20px;
-  border-radius: 10px;
+  padding: 22px;
+  border-radius: 12px;
   border: 1px solid #d8e2ea;
   border-top: 4px solid #2f80ed;
+  box-shadow: 0 2px 8px rgba(23, 50, 77, 0.06);
 }
+
 .summary-card h3 {
-  font-size: 15px;
+  font-size: 14px;
   color: #666;
   font-weight: normal;
 }
 
 .summary-card .amount {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: bold;
   margin-top: 10px;
   color: #17324d;
 }
 
-/* Quick Actions */
+/* Common Sections */
 
 .quick-actions,
 .transactions-section,
 .goals-section,
 .khata-section {
   background: white;
-  padding: 20px;
-  border-radius: 10px;
-  border: 1px solid #ddd;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid #d8e2ea;
+  box-shadow: 0 2px 8px rgba(23, 50, 77, 0.05);
 }
+
+/* Quick Actions */
 
 .action-buttons {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+}
+
+button,
+.primary-button,
+.secondary-button {
+  padding: 10px 18px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: none;
+  display: inline-block;
 }
 
 button {
-  padding: 10px 18px;
   border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
 }
 
 .primary-button {
@@ -113,6 +138,41 @@ button {
   color: #176b3a;
 }
 
+/* Transactions */
+
+.transactions-list {
+  margin-bottom: 18px;
+}
+
+.transactions-list > div {
+  padding: 14px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.transactions-list > div:last-child {
+  border-bottom: none;
+}
+
+.transactions-list p {
+  margin-bottom: 4px;
+}
+
+.update-button,
+.delete-button {
+  margin-top: 8px;
+  margin-right: 6px;
+}
+
+.update-button {
+  background: #eef4f8;
+  color: #17324d;
+}
+
+.delete-button {
+  background: #fce8e8;
+  color: #a33a3a;
+}
+
 /* Empty States */
 
 .empty-state {
@@ -120,7 +180,18 @@ button {
   padding: 10px 0;
 }
 
+/* Goals */
+
+.goals-list {
+  min-height: 40px;
+}
+
 /* Khata */
+
+.khata-section {
+  background: #e8f1ff;
+  border: 1px solid #c8ddf5;
+}
 
 .khata-content {
   display: flex;
@@ -129,20 +200,20 @@ button {
   gap: 20px;
 }
 
+.khata-content h2 {
+  color: #17324d;
+}
+
 .khata-content p {
   color: #666;
   margin-top: 8px;
   max-width: 600px;
 }
 
-.khata-section {
-  background: #e8f1ff;
-  border: 1px solid #c8ddf5;
-}
-
 .khata-button {
   background: #17324d;
   color: white;
+  white-space: nowrap;
 }
 
 /* Footer */
@@ -151,6 +222,7 @@ footer {
   padding: 20px 40px;
   text-align: center;
   color: #777;
+  font-size: 14px;
 }
 
 /* Responsive */
@@ -165,7 +237,7 @@ footer {
   }
 
   .header {
-    padding: 20px;
+    padding: 22px 20px;
   }
 }
 
@@ -181,6 +253,10 @@ footer {
 
   .action-buttons {
     flex-direction: column;
+  }
+
+  .action-buttons a {
+    text-align: center;
   }
 
   button {

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Transactions - MoneyMind</title>
+
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <h1>MoneyMind</h1>
+        <p>All Transactions</p>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="transactions-section">
+        <div class="section-heading">
+          <h2>All Transactions</h2>
+          <p>View and manage your income and expenses</p>
+        </div>
+
+        <div class="transactions-list">
+          <p class="empty-state">No transactions yet.</p>
+        </div>
+
+        <button id="refresh-transactions" class="primary-button">
+          Refresh Transactions
+        </button>
+
+        <a href="/" class="secondary-button"> Back to Dashboard </a>
+      </section>
+    </main>
+
+    <footer>
+      <p>MoneyMind</p>
+    </footer>
+
+    <script src="/frontend/js/transaction.js"></script>
+  </body>
+</html>

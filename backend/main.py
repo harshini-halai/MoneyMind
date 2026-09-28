@@ -43,6 +43,10 @@ def add_income_page():
 def add_expense_page():
     return FileResponse("frontend/templates/add-expense.html")
 
+@app.get("/transactions-page")
+def transactions_page():
+    return FileResponse("frontend/templates/transactions.html")
+
 
 @app.get("/transactions")
 def get_transactions():
