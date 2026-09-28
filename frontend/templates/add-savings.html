@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Add Savings - MoneyMind</title>
+
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <h1>MoneyMind</h1>
+        <p>Add Savings</p>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="transaction-form-section">
+        <div class="section-heading">
+          <h2>Add Savings</h2>
+          <p>Protect money for your future goals</p>
+        </div>
+
+        <form id="savings-form">
+          <input
+            type="number"
+            id="savings-amount"
+            placeholder="Amount"
+            min="1"
+            required
+          />
+
+          <input
+            type="text"
+            id="savings-description"
+            placeholder="Description"
+            required
+          />
+
+          <input type="date" id="savings-date" required />
+
+          <button type="submit" class="primary-button">Save Money</button>
+
+          <a href="/" class="secondary-button"> Cancel </a>
+        </form>
+
+        <p id="savings-message"></p>
+      </section>
+    </main>
+
+    <script src="/frontend/js/savings.js"></script>
+  </body>
+</html>

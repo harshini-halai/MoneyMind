@@ -47,6 +47,9 @@ def add_expense_page():
 def transactions_page():
     return FileResponse("frontend/templates/transactions.html")
 
+@app.get("/add-savings")
+def add_savings_page():
+    return FileResponse("frontend/templates/add-savings.html")
 
 @app.get("/transactions")
 def get_transactions():
@@ -114,6 +117,97 @@ def create_transaction(transaction: Transaction):
             detail="Unable to add transaction"
         )
 
+class Saving(BaseModel):
+    amount: float = Field(gt=0)
+    description: str
+    date: date
+
+@app.post("/savings")
+def create_saving(saving: Saving):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        INSERT INTO savings (amount, description, date)
+        VALUES (%s, %s, %s)
+        """
+
+        data = (
+            saving.amount,
+            saving.description,
+            saving.date
+        )
+
+        cursor.execute(query, data)
+        connection.commit()
+
+        cursor.close()
+        connection.close()
+
+        return {"message": "Saving added successfully"}
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to add saving"
+        )
+
+@app.get("/savings")
+def get_savings():
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        query = """
+        SELECT id, amount, description, date
+        FROM savings
+        ORDER BY id DESC
+        """
+
+        cursor.execute(query)
+        savings = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+
+        return savings
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to fetch savings"
+        )
+
+@app.get("/savings/total")
+def get_total_savings():
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        SELECT SUM(amount)
+        FROM savings
+        """
+
+        cursor.execute(query)
+        result = cursor.fetchone()
+
+        cursor.close()
+        connection.close()
+
+        total_savings = result[0] or 0
+
+        return {
+            "protected_savings": total_savings
+        }
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to fetch total savings"
+        )
+    
 @app.put("/transactions/{transaction_id}")
 def update_transaction(transaction_id: int, transaction: Transaction):
 
