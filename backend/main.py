@@ -301,6 +301,172 @@ def get_total_emergency_fund():
             detail="Unable to fetch total emergency fund"
         )
 
+class UpcomingExpense(BaseModel):
+    amount: float = Field(gt=0)
+    description: str
+    due_date: date   
+
+@app.post("/upcoming-expenses")
+def create_upcoming_expense(expense: UpcomingExpense):
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        INSERT INTO upcoming_expenses (amount, description, due_date)
+        VALUES (%s, %s, %s)
+        """
+
+        data = (
+            expense.amount,
+            expense.description,
+            expense.due_date
+        )
+
+        cursor.execute(query, data)
+        connection.commit()
+
+        cursor.close()
+        connection.close()
+
+        return {"message": "Upcoming expense added successfully"}
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to add upcoming expense"
+        )
+
+@app.get("/upcoming-expenses")
+def get_upcoming_expenses():
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        query = """
+        SELECT id, amount, description, due_date
+        FROM upcoming_expenses
+        ORDER BY due_date ASC
+        """
+
+        cursor.execute(query)
+
+        expenses = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+
+        return expenses
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to fetch upcoming expenses"
+        )  
+
+@app.get("/upcoming-expenses/total")
+def get_total_upcoming_expenses():
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        SELECT SUM(amount)
+        FROM upcoming_expenses
+        """
+
+        cursor.execute(query)
+
+        result = cursor.fetchone()
+
+        cursor.close()
+        connection.close()
+
+        total_upcoming_expenses = result[0] or 0
+
+        return {
+            "upcoming_expenses": total_upcoming_expenses
+        }
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to fetch total upcoming expenses"
+        )
+
+@app.get("/safe-to-spend")
+def get_safe_to_spend():
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        cursor.execute("""
+            SELECT
+                SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END),
+                SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END)
+            FROM transactions
+        """)
+
+        transaction_result = cursor.fetchone()
+
+        total_income = transaction_result[0] or 0
+        total_expenses = transaction_result[1] or 0
+
+        cursor.execute("""
+            SELECT SUM(amount)
+            FROM savings
+        """)
+
+        savings_result = cursor.fetchone()
+        protected_savings = savings_result[0] or 0
+
+        cursor.execute("""
+            SELECT SUM(amount)
+            FROM emergency_fund
+        """)
+
+        emergency_result = cursor.fetchone()
+        emergency_fund = emergency_result[0] or 0
+
+        cursor.execute("""
+            SELECT SUM(amount)
+            FROM upcoming_expenses
+        """)
+
+        upcoming_result = cursor.fetchone()
+        upcoming_expenses = upcoming_result[0] or 0
+
+        cursor.close()
+        connection.close()
+
+        available_balance = (
+            total_income
+            - total_expenses
+            - protected_savings
+            - emergency_fund
+        )
+
+        safe_to_spend = (
+            available_balance
+            - upcoming_expenses
+        )
+
+        return {
+            "available_balance": available_balance,
+            "upcoming_expenses": upcoming_expenses,
+            "safe_to_spend": safe_to_spend
+        }
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to calculate safe-to-spend"
+        )
+    
 @app.put("/transactions/{transaction_id}")
 def update_transaction(transaction_id: int, transaction: Transaction):
 

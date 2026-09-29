@@ -44,3 +44,18 @@ async function loadEmergencyFund() {
 }
 
 loadEmergencyFund();
+
+async function loadSafeToSpend() {
+  try {
+    const response = await fetch("http://127.0.0.1:8000/safe-to-spend");
+
+    const data = await response.json();
+
+    document.getElementById("safe-to-spend").textContent =
+      `₹${data.safe_to_spend}`;
+  } catch (error) {
+    console.log("Unable to load safe-to-spend");
+  }
+}
+
+loadSafeToSpend();
