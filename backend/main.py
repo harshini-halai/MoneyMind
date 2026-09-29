@@ -410,16 +410,41 @@ def get_balance():
 
         result = cursor.fetchone()
 
+        total_income = result[0] or 0
+        total_expenses = result[1] or 0
+
+        cursor.execute("""
+            SELECT SUM(amount)
+            FROM savings
+        """)
+
+        savings_result = cursor.fetchone()
+        protected_savings = savings_result[0] or 0
+
+        cursor.execute("""
+            SELECT SUM(amount)
+            FROM emergency_fund
+        """)
+
+        emergency_result = cursor.fetchone()
+        emergency_fund = emergency_result[0] or 0
+
         cursor.close()
         connection.close()
 
-        total_income = result[0] or 0
-        total_expenses = result[1] or 0
+        balance = (
+            total_income
+            - total_expenses
+            - protected_savings
+            - emergency_fund
+        )
 
         return {
             "total_income": total_income,
             "total_expenses": total_expenses,
-            "balance": total_income - total_expenses
+            "protected_savings": protected_savings,
+            "emergency_fund": emergency_fund,
+            "balance": balance
         }
 
     except Exception:
@@ -427,8 +452,6 @@ def get_balance():
             status_code=500,
             detail="Unable to fetch balance"
         )
-
-
 @app.get("/categories")
 def get_categories():
 

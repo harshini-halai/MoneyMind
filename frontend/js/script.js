@@ -29,3 +29,18 @@ async function loadSavings() {
 }
 
 loadSavings();
+
+async function loadEmergencyFund() {
+  try {
+    const response = await fetch("http://127.0.0.1:8000/emergency-fund/total");
+
+    const data = await response.json();
+
+    document.getElementById("emergency-fund").textContent =
+      `₹${data.emergency_fund}`;
+  } catch (error) {
+    console.log("Unable to load emergency fund");
+  }
+}
+
+loadEmergencyFund();
