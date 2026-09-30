@@ -55,6 +55,10 @@ def add_savings_page():
 def add_emergency_fund_page():
     return FileResponse("frontend/templates/add-emergency-fund.html")
 
+@app.get("/add-budget")
+def add_budget_page():
+    return FileResponse("frontend/templates/add-budget.html")
+
 @app.get("/transactions")
 def get_transactions():
 
@@ -466,7 +470,114 @@ def get_safe_to_spend():
             status_code=500,
             detail="Unable to calculate safe-to-spend"
         )
-    
+
+class Budget(BaseModel):
+    category: str
+    amount: float = Field(gt=0)
+    month: date
+
+@app.post("/budgets")
+def create_budget(budget: Budget):
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+
+        query = """
+        INSERT INTO budgets (category, amount, month)
+        VALUES (%s, %s, %s)
+        """
+
+        data = (
+            budget.category,
+            budget.amount,
+            budget.month
+        )
+
+        cursor.execute(query, data)
+        connection.commit()
+
+        cursor.close()
+        connection.close()
+
+        return {"message": "Budget added successfully"}
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to add budget"
+        )
+@app.get("/budgets")
+def get_budgets():
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        query = """
+        SELECT id, category, amount, month
+        FROM budgets
+        ORDER BY month DESC
+        """
+
+        cursor.execute(query)
+
+        budgets = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+
+        return budgets
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to fetch budgets"
+        ) 
+
+@app.get("/budgets/analysis")
+def get_budget_analysis():
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        query = """
+        SELECT
+            b.category,
+            b.amount AS budget,
+            COALESCE(SUM(t.amount), 0) AS spent
+        FROM budgets b
+        LEFT JOIN transactions t
+            ON b.category = t.category
+            AND t.type = 'expense'
+            AND YEAR(t.date) = YEAR(b.month)
+            AND MONTH(t.date) = MONTH(b.month)
+        GROUP BY b.id, b.category, b.amount
+        ORDER BY b.category
+        """
+
+        cursor.execute(query)
+
+        budgets = cursor.fetchall()
+
+        cursor.close()
+        connection.close()
+
+        for budget in budgets:
+            budget["remaining"] = (
+                float(budget["budget"])
+                - float(budget["spent"])
+            )
+
+        return budgets
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to analyze budgets"
+        )
+
 @app.put("/transactions/{transaction_id}")
 def update_transaction(transaction_id: int, transaction: Transaction):
 

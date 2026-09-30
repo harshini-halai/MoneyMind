@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Add Budget - MoneyMind</title>
+
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body>
+    <header class="header">
+      <div class="header-content">
+        <h1>MoneyMind</h1>
+        <p>Add Monthly Budget</p>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="transaction-form-section">
+        <div class="section-heading">
+          <h2>Add Budget</h2>
+          <p>Set a spending limit for a category</p>
+        </div>
+
+        <form id="budget-form">
+          <input
+            type="text"
+            id="budget-category"
+            placeholder="Category"
+            required
+          />
+
+          <input
+            type="number"
+            id="budget-amount"
+            placeholder="Budget Amount"
+            min="1"
+            required
+          />
+
+          <input type="date" id="budget-month" required />
+
+          <button type="submit" class="primary-button">Save Budget</button>
+
+          <a href="/" class="secondary-button"> Cancel </a>
+        </form>
+
+        <p id="budget-message"></p>
+      </section>
+    </main>
+
+    <script src="/frontend/js/budget.js"></script>
+  </body>
+</html>
