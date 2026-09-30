@@ -437,9 +437,12 @@ def get_safe_to_spend():
         emergency_fund = emergency_result[0] or 0
 
         cursor.execute("""
-            SELECT SUM(amount)
-            FROM upcoming_expenses
+        SELECT SUM(amount)
+        FROM upcoming_expenses
+        WHERE due_date BETWEEN CURRENT_DATE
+        AND DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY)
         """)
+        
 
         upcoming_result = cursor.fetchone()
         upcoming_expenses = upcoming_result[0] or 0

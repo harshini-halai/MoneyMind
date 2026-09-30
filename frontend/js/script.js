@@ -53,6 +53,8 @@ async function loadSafeToSpend() {
 
     document.getElementById("safe-to-spend").textContent =
       `₹${data.safe_to_spend}`;
+    document.getElementById("upcoming-expenses-summary").textContent =
+      `Upcoming: ₹${data.upcoming_expenses}`;
   } catch (error) {
     console.log("Unable to load safe-to-spend");
   }
