@@ -61,3 +61,62 @@ async function loadSafeToSpend() {
 }
 
 loadSafeToSpend();
+
+async function loadSpendingChart() {
+  try {
+    const response = await fetch("http://127.0.0.1:8000/categories");
+
+    const categories = await response.json();
+
+    const chartCanvas = document.getElementById("spending-chart");
+
+    if (!chartCanvas) {
+      return;
+    }
+
+    const labels = categories.map(function (item) {
+      return item.category;
+    });
+
+    const amounts = categories.map(function (item) {
+      return item.total;
+    });
+
+    new Chart(chartCanvas, {
+      type: "doughnut",
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            data: amounts,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                const total = context.dataset.data.reduce(function (
+                  sum,
+                  value,
+                ) {
+                  return sum + value;
+                }, 0);
+
+                const percentage = ((context.raw / total) * 100).toFixed(1);
+
+                return `${context.label}: ₹${context.raw} (${percentage}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+  } catch (error) {
+    console.log("Unable to load spending chart");
+  }
+}
+
+loadSpendingChart();
