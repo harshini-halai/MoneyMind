@@ -9,7 +9,7 @@
     "pydantic",
     "scikit",
     "uvicorn",
-    "fastapi"
+  
   ],
   "python-envs.defaultEnvManager": "ms-python.python:system"
 }
