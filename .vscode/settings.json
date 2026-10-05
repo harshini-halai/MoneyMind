@@ -8,6 +8,8 @@
     "pycache",
     "pydantic",
     "scikit",
-    "uvicorn"
-  ]
+    "uvicorn",
+    "fastapi"
+  ],
+  "python-envs.defaultEnvManager": "ms-python.python:system"
 }
