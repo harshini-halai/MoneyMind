@@ -760,3 +760,94 @@ def get_categories():
             status_code=500,
             detail="Unable to fetch category totals"
         )
+
+@app.get("/khata/summary")
+def khata_summary():
+    connection = get_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    # 1. Income and expenses
+    cursor.execute("""
+        SELECT
+            COALESCE(
+                SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END),
+                0
+            ) AS total_income,
+
+            COALESCE(
+                SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END),
+                0
+            ) AS total_expenses
+        FROM transactions
+    """)
+
+    transaction_summary = cursor.fetchone()
+
+    total_income = float(transaction_summary["total_income"])
+    total_expenses = float(transaction_summary["total_expenses"])
+
+    # 2. Protected savings
+    cursor.execute("""
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM savings
+    """)
+
+    protected_savings = float(cursor.fetchone()["total"])
+
+    # 3. Emergency fund
+    cursor.execute("""
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM emergency_fund
+    """)
+
+    emergency_fund = float(cursor.fetchone()["total"])
+
+    # 4. Upcoming expenses for next 30 days
+    cursor.execute("""
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM upcoming_expenses
+        WHERE due_date BETWEEN CURRENT_DATE
+        AND DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY)
+    """)
+
+    upcoming_expenses = float(cursor.fetchone()["total"])
+
+    # 5. Available balance
+    balance = (
+        total_income
+        - total_expenses
+        - protected_savings
+        - emergency_fund
+    )
+
+    # 6. Safe to spend
+    safe_to_spend = balance - upcoming_expenses
+
+    # 7. Category-wise spending
+    cursor.execute("""
+        SELECT
+            category,
+            COALESCE(SUM(amount), 0) AS total
+        FROM transactions
+        WHERE type = 'expense'
+        GROUP BY category
+        ORDER BY total DESC
+    """)
+
+    category_spending = cursor.fetchall()
+
+    # 8. Close database connection
+    cursor.close()
+    connection.close()
+
+    # 9. Return Khata's complete financial context
+    return {
+        "balance": balance,
+        "income": total_income,
+        "expenses": total_expenses,
+        "protected_savings": protected_savings,
+        "emergency_fund": emergency_fund,
+        "safe_to_spend": safe_to_spend,
+        "upcoming_expenses": upcoming_expenses,
+        "category_spending": category_spending
+    }
