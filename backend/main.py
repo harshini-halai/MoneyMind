@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from backend.database import get_connection
 from datetime import date
-
+from backend.security import hash_password, verify_password, create_access_token
 
 app = FastAPI()
 
@@ -851,3 +851,85 @@ def khata_summary():
         "upcoming_expenses": upcoming_expenses,
         "category_spending": category_spending
     }
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/register")
+def register_user(user: UserCreate):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    password_hash = hash_password(user.password)
+
+    try:
+        cursor.execute(
+            """
+            INSERT INTO users (name, email, password_hash)
+            VALUES (%s, %s, %s)
+            """,
+            (user.name, user.email, password_hash)
+        )
+
+        connection.commit()
+
+        return {"message": "User registered successfully"}
+
+    except Exception:
+        connection.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+
+    finally:
+        cursor.close()
+        connection.close()
+
+@app.post("/login")
+def login_user(user: UserLogin):
+    connection = get_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    try:
+        cursor.execute(
+            """
+            SELECT id, password_hash
+            FROM users
+            WHERE email = %s
+            """,
+            (user.email,)
+        )
+
+        db_user = cursor.fetchone()
+
+        if not db_user:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password"
+            )
+
+        if not verify_password(user.password, db_user["password_hash"]):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email or password"
+            )
+
+        token = create_access_token(db_user["id"])
+
+        return {
+            "access_token": token,
+            "token_type": "bearer"
+        }
+
+    finally:
+        cursor.close()
+        connection.close()
