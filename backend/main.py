@@ -193,18 +193,19 @@ def create_transaction(
 
 @app.get("/transactions")
 def get_transactions(user_id: int = Depends(get_current_user)):
-    try:
-        return fetch_all(
-            """
-            SELECT id, description, category, amount, date, type
-            FROM transactions
-            WHERE user_id = %s
-            ORDER BY id DESC
-            """,
-            (user_id,),
-        )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to fetch transactions")
+    connection = get_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    cursor.execute(
+        "SELECT * FROM transactions WHERE user_id = %s",
+        (user_id,)
+    )
+
+    transactions = cursor.fetchall()
+    cursor.close()
+    connection.close()
+
+    return transactions
 
 
 @app.put("/transactions/{transaction_id}")
