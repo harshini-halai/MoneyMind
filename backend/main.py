@@ -1,11 +1,14 @@
-from typing import Literal
+import os
+from io import BytesIO
+from typing import Literal, List, Optional
 from datetime import date
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from PIL import Image
 
 from backend.database import get_connection
 from backend.security import (
@@ -14,6 +17,7 @@ from backend.security import (
     create_access_token,
     get_current_user,
 )
+from backend.transaction_ocr import extract_transactions_from_image
 
 
 app = FastAPI()
@@ -33,97 +37,93 @@ app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
 def fetch_all(query, params=()):
     connection = None
-    cursor = None
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
         cursor.execute(query, params)
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        cursor.close()
+        return rows
     finally:
-        if cursor:
-            cursor.close()
         if connection and connection.is_connected():
             connection.close()
 
 
 def fetch_one(query, params=()):
     connection = None
-    cursor = None
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
         cursor.execute(query, params)
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        cursor.close()
+        return row
     finally:
-        if cursor:
-            cursor.close()
         if connection and connection.is_connected():
             connection.close()
 
 
 def execute_write(query, params=()):
     connection = None
-    cursor = None
     try:
         connection = get_connection()
         cursor = connection.cursor()
         cursor.execute(query, params)
         connection.commit()
-        return cursor.rowcount, cursor.lastrowid
-    except Exception:
-        if connection and connection.is_connected():
-            connection.rollback()
-        raise
+        last_id = cursor.lastrowid
+        cursor.close()
+        return last_id
     finally:
-        if cursor:
-            cursor.close()
         if connection and connection.is_connected():
             connection.close()
 
 
-# -------------------- MODELS --------------------
+# -------------------- PYDANTIC MODELS --------------------
+
+class User(BaseModel):
+    name: Optional[str] = "User"
+    email: Optional[str] = None
+    username: Optional[str] = None
+    password: str
+
+    def get_identifier(self) -> str:
+        ident = self.email or self.username or ""
+        if not ident:
+            raise ValueError("email or username is required")
+        if "@" not in ident:
+            return f"{ident}@moneymind.local"
+        return ident
+
 
 class Transaction(BaseModel):
     description: str
     category: Literal["Food", "Travel", "Shopping", "Bills", "Other"]
     amount: float = Field(gt=0)
     date: date
-    type: Literal["income", "expense"]
+    type: Literal["expense", "income"]
 
 
-class Saving(BaseModel):
-    amount: float = Field(gt=0)
-    description: str
-    date: date
+class SavingsGoal(BaseModel):
+    goal_name: str
+    target_amount: float = Field(gt=0)
+    saved_amount: float = Field(ge=0)
 
 
 class EmergencyFund(BaseModel):
-    amount: float = Field(gt=0)
-    description: str
-    date: date
+    target_months: int = Field(gt=0)
+    monthly_expense: float = Field(gt=0)
+    current_amount: float = Field(ge=0)
 
 
 class UpcomingExpense(BaseModel):
+    title: str
     amount: float = Field(gt=0)
-    description: str
     due_date: date
 
 
 class Budget(BaseModel):
-    category: str
-    amount: float = Field(gt=0)
-    month: date
-
-
-class UserCreate(BaseModel):
-    name: str
-    email: str
-    password: str
-
-
-class UserLogin(BaseModel):
-    email: str
-    password: str
+    category: Literal["Food", "Travel", "Shopping", "Bills", "Other"]
+    monthly_limit: float = Field(gt=0)
 
 
 # -------------------- FRONTEND PAGES --------------------
@@ -163,6 +163,49 @@ def add_budget_page():
     return FileResponse("frontend/templates/add-budget.html")
 
 
+# -------------------- AUTHENTICATION --------------------
+
+@app.post("/register")
+def register(user: User):
+    try:
+        user_email = user.get_identifier()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    existing_user = fetch_one(
+        "SELECT id FROM users WHERE email = %s",
+        (user_email,),
+    )
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    hashed_pw = hash_password(user.password)
+    user_name = user.name if user.name != "User" else (user.username or user_email.split("@")[0])
+    execute_write(
+        "INSERT INTO users (name, email, password_hash) VALUES (%s, %s, %s)",
+        (user_name, user_email, hashed_pw),
+    )
+    return {"message": "User registered successfully"}
+
+
+@app.post("/login")
+def login(user: User):
+    try:
+        user_email = user.get_identifier()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    db_user = fetch_one(
+        "SELECT id, password_hash FROM users WHERE email = %s",
+        (user_email,),
+    )
+    if not db_user or not verify_password(user.password, db_user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    token = create_access_token({"sub": str(db_user["id"])})
+    return {"access_token": token, "token_type": "bearer"}
+
+
 # -------------------- TRANSACTIONS --------------------
 
 @app.post("/transactions")
@@ -181,31 +224,25 @@ def create_transaction(
                 transaction.description,
                 transaction.category,
                 transaction.amount,
-                transaction.date,
+                str(transaction.date),
                 transaction.type,
                 user_id,
             ),
         )
         return {"message": "Transaction added successfully"}
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to add transaction")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/transactions")
 def get_transactions(user_id: int = Depends(get_current_user)):
-    connection = get_connection()
-    cursor = connection.cursor(dictionary=True)
-
-    cursor.execute(
-        "SELECT * FROM transactions WHERE user_id = %s",
-        (user_id,)
-    )
-
-    transactions = cursor.fetchall()
-    cursor.close()
-    connection.close()
-
-    return transactions
+    try:
+        return fetch_all(
+            "SELECT * FROM transactions WHERE user_id = %s ORDER BY date DESC",
+            (user_id,),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.put("/transactions/{transaction_id}")
@@ -215,37 +252,34 @@ def update_transaction(
     user_id: int = Depends(get_current_user),
 ):
     try:
-        rowcount, _ = execute_write(
+        existing = fetch_one(
+            "SELECT id FROM transactions WHERE id = %s AND user_id = %s",
+            (transaction_id, user_id),
+        )
+        if not existing:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
+        execute_write(
             """
             UPDATE transactions
-            SET description = %s, category = %s, amount = %s,
-                date = %s, type = %s
+            SET description = %s, category = %s, amount = %s, date = %s, type = %s
             WHERE id = %s AND user_id = %s
             """,
             (
                 transaction.description,
                 transaction.category,
                 transaction.amount,
-                transaction.date,
+                str(transaction.date),
                 transaction.type,
                 transaction_id,
                 user_id,
             ),
         )
-
-        if rowcount == 0:
-            exists = fetch_one(
-                "SELECT id FROM transactions WHERE id = %s AND user_id = %s",
-                (transaction_id, user_id),
-            )
-            if not exists:
-                raise HTTPException(status_code=404, detail="Transaction not found")
-
         return {"message": "Transaction updated successfully"}
     except HTTPException:
         raise
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to update transaction")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.delete("/transactions/{transaction_id}")
@@ -254,433 +288,333 @@ def delete_transaction(
     user_id: int = Depends(get_current_user),
 ):
     try:
-        rowcount, _ = execute_write(
+        existing = fetch_one(
+            "SELECT id FROM transactions WHERE id = %s AND user_id = %s",
+            (transaction_id, user_id),
+        )
+        if not existing:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
+        execute_write(
             "DELETE FROM transactions WHERE id = %s AND user_id = %s",
             (transaction_id, user_id),
         )
-        if rowcount == 0:
-            raise HTTPException(status_code=404, detail="Transaction not found")
         return {"message": "Transaction deleted successfully"}
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------- SCREENSHOT IMPORT --------------------
+
+@app.post("/transactions/import-screenshot")
+async def import_screenshot_preview(
+    file: UploadFile = File(...),
+    user_id: int = Depends(get_current_user),
+):
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="uploaded file is not an image")
+
+    contents = await file.read()
+    try:
+        img = Image.open(BytesIO(contents))
     except Exception:
-        raise HTTPException(status_code=500, detail="Unable to delete transaction")
+        raise HTTPException(status_code=400, detail="invalid image format")
+
+    extracted_items = extract_transactions_from_image(img)
+    return {"transactions": extracted_items}
 
 
-# -------------------- PROTECTED SAVINGS --------------------
+@app.post("/transactions/confirm-import")
+def confirm_imported_transactions(
+    items: List[Transaction],
+    user_id: int = Depends(get_current_user),
+):
+    saved_count = 0
+    for item in items:
+        execute_write(
+            """
+            INSERT INTO transactions
+            (description, category, amount, date, type, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                item.description,
+                item.category,
+                item.amount,
+                str(item.date),
+                item.type,
+                user_id,
+            ),
+        )
+        saved_count += 1
+
+    return {"message": "transactions imported successfully", "count": saved_count}
+
+
+# -------------------- SAVINGS --------------------
 
 @app.post("/savings")
-def create_saving(
-    saving: Saving,
+def create_savings_goal(
+    goal: SavingsGoal,
     user_id: int = Depends(get_current_user),
 ):
     try:
         execute_write(
             """
-            INSERT INTO savings (amount, description, date, user_id)
+            INSERT INTO savings_goals
+            (goal_name, target_amount, saved_amount, user_id)
             VALUES (%s, %s, %s, %s)
             """,
-            (saving.amount, saving.description, saving.date, user_id),
+            (goal.goal_name, goal.target_amount, goal.saved_amount, user_id),
         )
-        return {"message": "Saving added successfully"}
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to add saving")
+        return {"message": "Savings goal added successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/savings")
-def get_savings(user_id: int = Depends(get_current_user)):
+def get_savings_goals(user_id: int = Depends(get_current_user)):
     try:
         return fetch_all(
-            """
-            SELECT id, amount, description, date
-            FROM savings
-            WHERE user_id = %s
-            ORDER BY id DESC
-            """,
+            "SELECT * FROM savings_goals WHERE user_id = %s",
             (user_id,),
         )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to fetch savings")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/savings/total")
+def get_total_savings(user_id: int = Depends(get_current_user)):
+    try:
+        row = fetch_one(
+            "SELECT COALESCE(SUM(saved_amount), 0) as total FROM savings_goals WHERE user_id = %s",
+            (user_id,),
+        )
+        return {"total_savings": float(row["total"]) if row else 0.0}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # -------------------- EMERGENCY FUND --------------------
 
 @app.post("/emergency-fund")
-def create_emergency_fund(
+def set_emergency_fund(
     fund: EmergencyFund,
     user_id: int = Depends(get_current_user),
 ):
     try:
         execute_write(
             """
-            INSERT INTO emergency_fund (amount, description, date, user_id)
+            INSERT INTO emergency_funds
+            (target_months, monthly_expense, current_amount, user_id)
             VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+            target_months = VALUES(target_months),
+            monthly_expense = VALUES(monthly_expense),
+            current_amount = VALUES(current_amount)
             """,
-            (fund.amount, fund.description, fund.date, user_id),
+            (fund.target_months, fund.monthly_expense, fund.current_amount, user_id),
         )
-        return {"message": "Emergency fund added successfully"}
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to add emergency fund")
+        return {"message": "Emergency fund updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/emergency-fund")
 def get_emergency_fund(user_id: int = Depends(get_current_user)):
     try:
-        return fetch_all(
-            """
-            SELECT id, amount, description, date
-            FROM emergency_fund
-            WHERE user_id = %s
-            ORDER BY id DESC
-            """,
+        fund = fetch_one(
+            "SELECT * FROM emergency_funds WHERE user_id = %s",
             (user_id,),
         )
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Unable to fetch emergency fund"
+        return fund or {}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/emergency-fund/total")
+def get_total_emergency_fund(user_id: int = Depends(get_current_user)):
+    try:
+        row = fetch_one(
+            "SELECT COALESCE(current_amount, 0) as total FROM emergency_funds WHERE user_id = %s",
+            (user_id,),
         )
+        return {"total_emergency_fund": float(row["total"]) if row else 0.0}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # -------------------- UPCOMING EXPENSES --------------------
 
 @app.post("/upcoming-expenses")
 def create_upcoming_expense(
-    expense: UpcomingExpense,
+    expense_item: UpcomingExpense,
     user_id: int = Depends(get_current_user),
 ):
     try:
         execute_write(
             """
             INSERT INTO upcoming_expenses
-            (amount, description, due_date, user_id)
+            (title, amount, due_date, user_id)
             VALUES (%s, %s, %s, %s)
             """,
-            (expense.amount, expense.description, expense.due_date, user_id),
+            (expense_item.title, expense_item.amount, str(expense_item.due_date), user_id),
         )
         return {"message": "Upcoming expense added successfully"}
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Unable to add upcoming expense"
-        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/upcoming-expenses")
 def get_upcoming_expenses(user_id: int = Depends(get_current_user)):
     try:
         return fetch_all(
-            """
-            SELECT id, amount, description, due_date
-            FROM upcoming_expenses
-            WHERE user_id = %s
-            ORDER BY due_date ASC
-            """,
+            "SELECT * FROM upcoming_expenses WHERE user_id = %s ORDER BY due_date ASC",
             (user_id,),
         )
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Unable to fetch upcoming expenses"
-        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/upcoming-expenses/total")
 def get_total_upcoming_expenses(user_id: int = Depends(get_current_user)):
     try:
-        result = fetch_one(
-            """
-            SELECT COALESCE(SUM(amount), 0) AS total
-            FROM upcoming_expenses
-            WHERE user_id = %s
-            """,
+        row = fetch_one(
+            "SELECT COALESCE(SUM(amount), 0) as total FROM upcoming_expenses WHERE user_id = %s",
             (user_id,),
         )
-        return {"upcoming_expenses": result["total"]}
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Unable to fetch total upcoming expenses"
-        )
+        return {"total_upcoming_expenses": float(row["total"]) if row else 0.0}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # -------------------- BALANCE & SAFE TO SPEND --------------------
 
-def calculate_finances(user_id: int):
-    transactions = fetch_one(
-        """
-        SELECT
-            COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0)
-                AS total_income,
-            COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)
-                AS total_expenses
-        FROM transactions
-        WHERE user_id = %s
-        """,
-        (user_id,),
-    )
-
-    savings = fetch_one(
-        "SELECT COALESCE(SUM(amount), 0) AS total FROM savings WHERE user_id = %s",
-        (user_id,),
-    )
-
-    emergency = fetch_one(
-        """
-        SELECT COALESCE(SUM(amount), 0) AS total
-        FROM emergency_fund WHERE user_id = %s
-        """,
-        (user_id,),
-    )
-
-    upcoming = fetch_one(
-        """
-        SELECT COALESCE(SUM(amount), 0) AS total
-        FROM upcoming_expenses
-        WHERE user_id = %s
-          AND due_date BETWEEN CURRENT_DATE
-          AND DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY)
-        """,
-        (user_id,),
-    )
-
-    income = float(transactions["total_income"])
-    expenses = float(transactions["total_expenses"])
-    protected_savings = float(savings["total"])
-    emergency_fund = float(emergency["total"])
-    upcoming_expenses = float(upcoming["total"])
-
-    balance = income - expenses - protected_savings - emergency_fund
-
-    return {
-        "total_income": income,
-        "total_expenses": expenses,
-        "protected_savings": protected_savings,
-        "emergency_fund": emergency_fund,
-        "upcoming_expenses": upcoming_expenses,
-        "balance": balance,
-        "safe_to_spend": balance - upcoming_expenses,
-    }
-
-
 @app.get("/balance")
 def get_balance(user_id: int = Depends(get_current_user)):
     try:
-        result = calculate_finances(user_id)
+        income_row = fetch_one(
+            "SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE user_id = %s AND type = 'income'",
+            (user_id,),
+        )
+        expense_row = fetch_one(
+            "SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE user_id = %s AND type = 'expense'",
+            (user_id,),
+        )
+        income = float(income_row["total"])
+        expense_amt = float(expense_row["total"])
         return {
-            "total_income": result["total_income"],
-            "total_expenses": result["total_expenses"],
-            "protected_savings": result["protected_savings"],
-            "emergency_fund": result["emergency_fund"],
-            "balance": result["balance"],
+            "total_income": income,
+            "total_expense": expense_amt,
+            "balance": income - expense_amt,
         }
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to fetch balance")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/safe-to-spend")
 def get_safe_to_spend(user_id: int = Depends(get_current_user)):
     try:
-        result = calculate_finances(user_id)
-        return {
-            "available_balance": result["balance"],
-            "upcoming_expenses": result["upcoming_expenses"],
-            "safe_to_spend": result["safe_to_spend"],
-        }
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Unable to calculate safe-to-spend"
+        balance_data = get_balance(user_id=user_id)
+        current_balance = balance_data["balance"]
+
+        upcoming_row = fetch_one(
+            "SELECT COALESCE(SUM(amount), 0) as total FROM upcoming_expenses WHERE user_id = %s",
+            (user_id,),
         )
+        upcoming_total = float(upcoming_row["total"]) if upcoming_row else 0.0
+
+        safe_amount = max(0.0, current_balance - upcoming_total)
+        return {
+            "current_balance": current_balance,
+            "upcoming_commitments": upcoming_total,
+            "safe_to_spend": safe_amount,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # -------------------- BUDGETS --------------------
 
 @app.post("/budgets")
-def create_budget(
+def set_budget(
     budget: Budget,
     user_id: int = Depends(get_current_user),
 ):
     try:
         execute_write(
             """
-            INSERT INTO budgets (category, amount, month, user_id)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO budgets (category, monthly_limit, user_id)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE monthly_limit = VALUES(monthly_limit)
             """,
-            (budget.category, budget.amount, budget.month, user_id),
+            (budget.category, budget.monthly_limit, user_id),
         )
-        return {"message": "Budget added successfully"}
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to add budget")
+        return {"message": "Budget set successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/budgets")
 def get_budgets(user_id: int = Depends(get_current_user)):
     try:
         return fetch_all(
-            """
-            SELECT id, category, amount, month
-            FROM budgets
-            WHERE user_id = %s
-            ORDER BY month DESC
-            """,
+            "SELECT * FROM budgets WHERE user_id = %s",
             (user_id,),
         )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to fetch budgets")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/budgets/analysis")
 def get_budget_analysis(user_id: int = Depends(get_current_user)):
     try:
         budgets = fetch_all(
-            """
-            SELECT
-                b.category,
-                b.amount AS budget,
-                COALESCE(SUM(t.amount), 0) AS spent
-            FROM budgets b
-            LEFT JOIN transactions t
-                ON b.category = t.category
-                AND t.type = 'expense'
-                AND t.user_id = b.user_id
-                AND YEAR(t.date) = YEAR(b.month)
-                AND MONTH(t.date) = MONTH(b.month)
-            WHERE b.user_id = %s
-            GROUP BY b.id, b.category, b.amount
-            ORDER BY b.category
-            """,
+            "SELECT * FROM budgets WHERE user_id = %s",
             (user_id,),
         )
+        analysis_data = []
+        for b in budgets:
+            cat = b["category"]
+            limit_val = float(b["monthly_limit"])
+            spent_row = fetch_one(
+                """
+                SELECT COALESCE(SUM(amount), 0) as spent
+                FROM transactions
+                WHERE user_id = %s AND category = %s AND type = 'expense'
+                """,
+                (user_id, cat),
+            )
+            spent_val = float(spent_row["spent"])
+            analysis_data.append({
+                "category": cat,
+                "monthly_limit": limit_val,
+                "spent": spent_val,
+                "remaining": limit_val - spent_val,
+                "over_budget": spent_val > limit_val,
+            })
+        return analysis_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-        for budget in budgets:
-            budget["budget"] = float(budget["budget"])
-            budget["spent"] = float(budget["spent"])
-            budget["remaining"] = budget["budget"] - budget["spent"]
 
-        return budgets
-    except Exception:
-        raise HTTPException(status_code=500, detail="Unable to analyze budgets")
-
-
-# -------------------- CATEGORIES --------------------
+# -------------------- CATEGORIES & KHATA SUMMARY --------------------
 
 @app.get("/categories")
-def get_categories(user_id: int = Depends(get_current_user)):
-    try:
-        categories = fetch_all(
-            """
-            SELECT category, SUM(amount) AS total
-            FROM transactions
-            WHERE type = 'expense' AND user_id = %s
-            GROUP BY category
-            """,
-            (user_id,),
-        )
-        for category in categories:
-            category["total"] = float(category["total"])
-        return categories
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Unable to fetch category totals"
-        )
+def get_categories():
+    return {"categories": ["Food", "Travel", "Shopping", "Bills", "Other"]}
 
-
-# -------------------- KHATA SUMMARY --------------------
 
 @app.get("/khata/summary")
-def khata_summary(user_id: int = Depends(get_current_user)):
+def get_khata_summary(user_id: int = Depends(get_current_user)):
     try:
-        result = calculate_finances(user_id)
-
-        category_spending = fetch_all(
-            """
-            SELECT category, COALESCE(SUM(amount), 0) AS total
-            FROM transactions
-            WHERE type = 'expense' AND user_id = %s
-            GROUP BY category
-            ORDER BY total DESC
-            """,
-            (user_id,),
-        )
-
-        for category in category_spending:
-            category["total"] = float(category["total"])
-
+        balance_info = get_balance(user_id=user_id)
+        budget_info = get_budget_analysis(user_id=user_id)
         return {
-            "balance": result["balance"],
-            "income": result["total_income"],
-            "expenses": result["total_expenses"],
-            "protected_savings": result["protected_savings"],
-            "emergency_fund": result["emergency_fund"],
-            "safe_to_spend": result["safe_to_spend"],
-            "upcoming_expenses": result["upcoming_expenses"],
-            "category_spending": category_spending,
+            "balance": balance_info,
+            "budgets": budget_info,
         }
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Unable to fetch Khata summary"
-        )
-
-
-# -------------------- AUTHENTICATION --------------------
-
-@app.post("/register")
-def register_user(user: UserCreate):
-    connection = None
-    cursor = None
-
-    try:
-        connection = get_connection()
-        cursor = connection.cursor()
-        hashed_password = hash_password(user.password)
-
-        cursor.execute(
-            """
-            INSERT INTO users (name, email, password_hash)
-            VALUES (%s, %s, %s)
-            """,
-            (user.name, user.email, hashed_password),
-        )
-        connection.commit()
-        return {"message": "User registered successfully"}
-
-    except Exception:
-        if connection and connection.is_connected():
-            connection.rollback()
-        raise HTTPException(
-            status_code=400, detail="Unable to register user; check the email"
-        )
-
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
-
-
-@app.post("/login")
-def login_user(user: UserLogin):
-    connection = None
-    cursor = None
-
-    try:
-        connection = get_connection()
-        cursor = connection.cursor(dictionary=True)
-
-        cursor.execute(
-            "SELECT id, password_hash FROM users WHERE email = %s",
-            (user.email,),
-        )
-        db_user = cursor.fetchone()
-
-        if not db_user or not verify_password(
-            user.password, db_user["password_hash"]
-        ):
-            raise HTTPException(
-                status_code=401, detail="Invalid email or password"
-            )
-
-        token = create_access_token(db_user["id"])
-        return {"access_token": token, "token_type": "bearer"}
-
-    finally:
-        if cursor:
-            cursor.close()
-        if connection and connection.is_connected():
-            connection.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

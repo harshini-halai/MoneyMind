@@ -1,45 +1,78 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoneyMind - Transactions</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Transactions</h1>
+            <nav>
+                <a href="/">Dashboard</a>
+                <a href="/add-income">Add Income</a>
+                <a href="/add-expense">Add Expense</a>
+                <a href="/add-budget">Budgets</a>
+                <a href="/add-savings">Savings</a>
+                <button id="logout-btn">Logout</button>
+            </nav>
+        </header>
 
-    <title>Transactions - MoneyMind</title>
+        <section class="card" id="screenshot-import-card">
+            <h3>Import Transaction from Screenshot</h3>
+            <p>Upload a UPI/bank transfer screenshot to extract and preview transactions.</p>
+            <div class="import-controls">
+                <input type="file" id="screenshot-file-input" accept="image/*">
+                <button type="button" id="upload-screenshot-btn">Extract Preview</button>
+            </div>
+            <div id="import-status" style="margin-top: 10px; font-weight: bold;"></div>
 
-    <link rel="stylesheet" href="/frontend/style.css" />
-  </head>
+            <!-- Preview & Review Container -->
+            <div id="preview-section" style="display: none; margin-top: 20px;">
+                <h4>Review Extracted Transactions</h4>
+                <p>Verify details or fix any flagged fields before saving.</p>
+                <table class="data-table" id="preview-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount (₹)</th>
+                            <th>Type</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="preview-list"></tbody>
+                </table>
+                <div style="margin-top: 15px;">
+                    <button type="button" id="confirm-import-btn" class="btn-primary">Confirm & Save All</button>
+                    <button type="button" id="cancel-import-btn">Cancel</button>
+                </div>
+            </div>
+        </section>
 
-  <body>
-    <header class="header">
-      <div class="header-content">
-        <h1>MoneyMind</h1>
-        <p>All Transactions</p>
-      </div>
-    </header>
+        <section class="card" style="margin-top: 20px;">
+            <h3>Transaction History</h3>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="transaction-list"></tbody>
+            </table>
+        </section>
+    </div>
 
-    <main class="dashboard">
-      <section class="transactions-section">
-        <div class="section-heading">
-          <h2>All Transactions</h2>
-          <p>View and manage your income and expenses</p>
-        </div>
-
-        <div class="transactions-list">
-          <p class="empty-state">No transactions yet.</p>
-        </div>
-
-        <button id="refresh-transactions" class="primary-button">
-          Refresh Transactions
-        </button>
-
-        <a href="/" class="secondary-button"> Back to Dashboard </a>
-      </section>
-    </main>
-
-    <footer>
-      <p>MoneyMind</p>
-    </footer>
-
-    <script src="/frontend/js/transaction.js"></script>
-  </body>
+    <script src="../js/script.js"></script>
+    <script src="../js/transaction.js"></script>
+</body>
 </html>
