@@ -1,4 +1,4 @@
-import os
+﻿import os
 from io import BytesIO
 from typing import Literal, List, Optional
 from datetime import date
@@ -19,7 +19,6 @@ from backend.security import (
 )
 from backend.transaction_ocr import extract_transactions_from_image
 
-
 app = FastAPI()
 
 app.add_middleware(
@@ -31,7 +30,6 @@ app.add_middleware(
 )
 
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
-
 
 # -------------------- DATABASE HELPERS --------------------
 
@@ -48,7 +46,6 @@ def fetch_all(query, params=()):
         if connection and connection.is_connected():
             connection.close()
 
-
 def fetch_one(query, params=()):
     connection = None
     try:
@@ -61,7 +58,6 @@ def fetch_one(query, params=()):
     finally:
         if connection and connection.is_connected():
             connection.close()
-
 
 def execute_write(query, params=()):
     connection = None
@@ -76,7 +72,6 @@ def execute_write(query, params=()):
     finally:
         if connection and connection.is_connected():
             connection.close()
-
 
 # -------------------- PYDANTIC MODELS --------------------
 
@@ -94,7 +89,6 @@ class User(BaseModel):
             return f"{ident}@moneymind.local"
         return ident
 
-
 class Transaction(BaseModel):
     description: str
     category: Literal["Food", "Travel", "Shopping", "Bills", "Other"]
@@ -102,29 +96,24 @@ class Transaction(BaseModel):
     date: date
     type: Literal["expense", "income"]
 
-
 class SavingsGoal(BaseModel):
     goal_name: str
     target_amount: float = Field(gt=0)
     saved_amount: float = Field(ge=0)
-
 
 class EmergencyFund(BaseModel):
     target_months: int = Field(gt=0)
     monthly_expense: float = Field(gt=0)
     current_amount: float = Field(ge=0)
 
-
 class UpcomingExpense(BaseModel):
     title: str
     amount: float = Field(gt=0)
     due_date: date
 
-
 class Budget(BaseModel):
     category: Literal["Food", "Travel", "Shopping", "Bills", "Other"]
     monthly_limit: float = Field(gt=0)
-
 
 # -------------------- FRONTEND PAGES --------------------
 
@@ -132,36 +121,33 @@ class Budget(BaseModel):
 def home():
     return FileResponse("frontend/templates/index.html")
 
-
 @app.get("/add-income")
 def add_income_page():
     return FileResponse("frontend/templates/add-income.html")
-
 
 @app.get("/add-expense")
 def add_expense_page():
     return FileResponse("frontend/templates/add-expense.html")
 
-
 @app.get("/transactions-page")
 def transactions_page():
     return FileResponse("frontend/templates/transactions.html")
-
 
 @app.get("/add-savings")
 def add_savings_page():
     return FileResponse("frontend/templates/add-savings.html")
 
-
 @app.get("/add-emergency-fund")
 def add_emergency_fund_page():
     return FileResponse("frontend/templates/add-emergency-fund.html")
-
 
 @app.get("/add-budget")
 def add_budget_page():
     return FileResponse("frontend/templates/add-budget.html")
 
+@app.get("/login-page")
+def login_page():
+    return FileResponse("frontend/templates/login.html")
 
 # -------------------- AUTHENTICATION --------------------
 
@@ -187,7 +173,6 @@ def register(user: User):
     )
     return {"message": "User registered successfully"}
 
-
 @app.post("/login")
 def login(user: User):
     try:
@@ -202,9 +187,8 @@ def login(user: User):
     if not db_user or not verify_password(user.password, db_user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
-    token = create_access_token({"sub": str(db_user["id"])})
+    token = create_access_token(int(db_user["id"]))
     return {"access_token": token, "token_type": "bearer"}
-
 
 # -------------------- TRANSACTIONS --------------------
 
@@ -233,7 +217,6 @@ def create_transaction(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/transactions")
 def get_transactions(user_id: int = Depends(get_current_user)):
     try:
@@ -243,7 +226,6 @@ def get_transactions(user_id: int = Depends(get_current_user)):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.put("/transactions/{transaction_id}")
 def update_transaction(
@@ -281,7 +263,6 @@ def update_transaction(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.delete("/transactions/{transaction_id}")
 def delete_transaction(
     transaction_id: int,
@@ -305,7 +286,6 @@ def delete_transaction(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 # -------------------- SCREENSHOT IMPORT --------------------
 
 @app.post("/transactions/import-screenshot")
@@ -324,7 +304,6 @@ async def import_screenshot_preview(
 
     extracted_items = extract_transactions_from_image(img)
     return {"transactions": extracted_items}
-
 
 @app.post("/transactions/confirm-import")
 def confirm_imported_transactions(
@@ -352,7 +331,6 @@ def confirm_imported_transactions(
 
     return {"message": "transactions imported successfully", "count": saved_count}
 
-
 # -------------------- SAVINGS --------------------
 
 @app.post("/savings")
@@ -373,7 +351,6 @@ def create_savings_goal(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/savings")
 def get_savings_goals(user_id: int = Depends(get_current_user)):
     try:
@@ -383,7 +360,6 @@ def get_savings_goals(user_id: int = Depends(get_current_user)):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/savings/total")
 def get_total_savings(user_id: int = Depends(get_current_user)):
@@ -395,7 +371,6 @@ def get_total_savings(user_id: int = Depends(get_current_user)):
         return {"total_savings": float(row["total"]) if row else 0.0}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 # -------------------- EMERGENCY FUND --------------------
 
@@ -421,7 +396,6 @@ def set_emergency_fund(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/emergency-fund")
 def get_emergency_fund(user_id: int = Depends(get_current_user)):
     try:
@@ -433,7 +407,6 @@ def get_emergency_fund(user_id: int = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/emergency-fund/total")
 def get_total_emergency_fund(user_id: int = Depends(get_current_user)):
     try:
@@ -444,7 +417,6 @@ def get_total_emergency_fund(user_id: int = Depends(get_current_user)):
         return {"total_emergency_fund": float(row["total"]) if row else 0.0}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 # -------------------- UPCOMING EXPENSES --------------------
 
@@ -466,7 +438,6 @@ def create_upcoming_expense(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/upcoming-expenses")
 def get_upcoming_expenses(user_id: int = Depends(get_current_user)):
     try:
@@ -476,7 +447,6 @@ def get_upcoming_expenses(user_id: int = Depends(get_current_user)):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/upcoming-expenses/total")
 def get_total_upcoming_expenses(user_id: int = Depends(get_current_user)):
@@ -488,7 +458,6 @@ def get_total_upcoming_expenses(user_id: int = Depends(get_current_user)):
         return {"total_upcoming_expenses": float(row["total"]) if row else 0.0}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 # -------------------- BALANCE & SAFE TO SPEND --------------------
 
@@ -513,7 +482,6 @@ def get_balance(user_id: int = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/safe-to-spend")
 def get_safe_to_spend(user_id: int = Depends(get_current_user)):
     try:
@@ -535,7 +503,6 @@ def get_safe_to_spend(user_id: int = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 # -------------------- BUDGETS --------------------
 
 @app.post("/budgets")
@@ -556,7 +523,6 @@ def set_budget(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @app.get("/budgets")
 def get_budgets(user_id: int = Depends(get_current_user)):
     try:
@@ -566,7 +532,6 @@ def get_budgets(user_id: int = Depends(get_current_user)):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/budgets/analysis")
 def get_budget_analysis(user_id: int = Depends(get_current_user)):
@@ -599,13 +564,11 @@ def get_budget_analysis(user_id: int = Depends(get_current_user)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 # -------------------- CATEGORIES & KHATA SUMMARY --------------------
 
 @app.get("/categories")
 def get_categories():
     return {"categories": ["Food", "Travel", "Shopping", "Bills", "Other"]}
-
 
 @app.get("/khata/summary")
 def get_khata_summary(user_id: int = Depends(get_current_user)):

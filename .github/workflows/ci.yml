@@ -1,0 +1,154 @@
+﻿name: MoneyMind CI
+
+on:
+  push:
+    branches:
+      - main
+      - security
+      - 'feature/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: moneymind-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cooldown:
+    name: Check CI cooldown
+    runs-on: ubuntu-latest
+    outputs:
+      run_tests: ${{ steps.check.outputs.run_tests }}
+    steps:
+      - name: Check last full test run
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const now = Date.now();
+            const cooldownMs = 3 * 60 * 60 * 1000;
+
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: "ci.yml",
+              per_page: 50
+            });
+
+            const previousRuns = runs.data.workflow_runs
+              .filter(run =>
+                run.id !== context.runId &&
+                run.status === "completed"
+              )
+              .sort((a, b) =>
+                Date.parse(b.created_at) - Date.parse(a.created_at)
+              );
+
+            let lastTestStart = null;
+
+            for (const run of previousRuns) {
+              const result = await github.rest.actions.listJobsForWorkflowRun({
+                owner,
+                repo,
+                run_id: run.id,
+                per_page: 100
+              });
+
+              const testJob = result.data.jobs.find(
+                job => job.name === "Run automated tests"
+              );
+
+              if (testJob && testJob.started_at) {
+                lastTestStart = Date.parse(testJob.started_at);
+                break;
+              }
+            }
+
+            const bypassCooldown =
+              context.eventName === "pull_request" ||
+              context.eventName === "workflow_dispatch";
+
+            const shouldRun =
+              bypassCooldown ||
+              lastTestStart === null ||
+              now - lastTestStart >= cooldownMs;
+
+            core.setOutput("run_tests", String(shouldRun));
+
+            if (shouldRun) {
+              core.info("CI checks will run.");
+            } else {
+              core.info("Push skipped: full CI checks ran within the last 3 hours.");
+            }
+
+  tests:
+    name: Run automated tests
+    needs: cooldown
+    if: needs.cooldown.outputs.run_tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Check Python syntax
+        run: python -m compileall -q backend
+
+      - name: Run test suite when tests exist
+        shell: bash
+        run: |
+          if find . \
+            -path './.git' -prune -o \
+            -path './.venv' -prune -o \
+            -path './venv' -prune -o \
+            \( -name 'test_*.py' -o -name '*_test.py' \) \
+            -print -quit | grep -q .; then
+            python -m pytest -q
+          else
+            echo "No Python test files found; syntax check completed."
+          fi
+
+  merge-gate:
+    name: CI merge gate
+    if: always()
+    needs: [cooldown, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate test result
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_TESTS: ${{ needs.cooldown.outputs.run_tests }}
+          TEST_RESULT: ${{ needs.tests.result }}
+        run: |
+          if [ "$RUN_TESTS" = "true" ] &&
+             [ "$TEST_RESULT" != "success" ]; then
+            echo "Required tests did not pass."
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "pull_request" ] &&
+             [ "$RUN_TESTS" != "true" ]; then
+            echo "Tests must run before merging a pull request."
+            exit 1
+          fi
+
+          echo "CI gate passed."
