@@ -1,8 +1,6 @@
 ﻿<!doctype html>
 <html lang="en">
   <head>
-    <script src="/frontend/js/auth.js"></script>
-
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -11,50 +9,51 @@
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
-  <body>
+  <body data-auth="required">
     <header class="header">
-    <script src="/frontend/js/auth.js"></script>
-
-      <div class="header-content">
-        <h1>MoneyMind</h1>
-        <p>Add Savings</p>
+      <div class="header-content header-row">
+        <div>
+          <h1><a href="/">MoneyMind</a></h1>
+          <p>Add Savings</p>
+        </div>
+        <button type="button" id="logout-button" class="logout-button">Log out</button>
       </div>
     </header>
 
     <main class="dashboard">
-      <section class="transaction-form-section">
+      <section class="form-card">
         <div class="section-heading">
           <h2>Add Savings</h2>
           <p>Protect money for your future goals</p>
         </div>
 
         <form id="savings-form">
-          <input
-            type="number"
-            id="savings-amount"
-            placeholder="Amount"
-            min="1"
-            required
-          />
+          <div class="form-field">
+            <label for="savings-amount">Amount (₹)</label>
+            <input type="number" id="savings-amount" placeholder="0.00" min="0.01" step="0.01" required />
+          </div>
 
-          <input
-            type="text"
-            id="savings-description"
-            placeholder="Description"
-            required
-          />
+          <div class="form-field">
+            <label for="savings-description">Description</label>
+            <input type="text" id="savings-description" placeholder="e.g. Monthly savings" maxlength="255" required />
+          </div>
 
-          <input type="date" id="savings-date" required />
+          <div class="form-field">
+            <label for="savings-date">Date</label>
+            <input type="date" id="savings-date" required />
+          </div>
 
-          <button type="submit" class="primary-button">Save Money</button>
-
-          <a href="/" class="secondary-button"> Cancel </a>
+          <div class="form-actions">
+            <button type="submit" class="primary-button">Save Money</button>
+            <a href="/" class="secondary-button">Cancel</a>
+          </div>
         </form>
 
-        <p id="savings-message"></p>
+        <p id="savings-message" class="message" hidden></p>
       </section>
     </main>
 
+    <script src="/frontend/js/api.js"></script>
     <script src="/frontend/js/savings.js"></script>
   </body>
 </html>
