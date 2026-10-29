@@ -1,82 +1,100 @@
-﻿<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="en">
-<head>
-    <script src="/frontend/js/auth.js"></script>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MoneyMind - Transactions</title>
-    <link rel="stylesheet" href="../style.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-    <script src="/frontend/js/auth.js"></script>
+    <title>Transactions - MoneyMind</title>
 
-            <h1>Transactions</h1>
-            <nav>
-                <a href="/">Dashboard</a>
-                <a href="/add-income">Add Income</a>
-                <a href="/add-expense">Add Expense</a>
-                <a href="/add-budget">Budgets</a>
-                <a href="/add-savings">Savings</a>
-                <button id="logout-btn">Logout</button>
-            </nav>
-        </header>
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
 
-        <section class="card" id="screenshot-import-card">
-            <h3>Import Transaction from Screenshot</h3>
-            <p>Upload a UPI/bank transfer screenshot to extract and preview transactions.</p>
-            <div class="import-controls">
-                <input type="file" id="screenshot-file-input" accept="image/*">
-                <button type="button" id="upload-screenshot-btn">Extract Preview</button>
-            </div>
-            <div id="import-status" style="margin-top: 10px; font-weight: bold;"></div>
+  <body data-auth="required">
+    <header class="header">
+      <div class="header-content header-row">
+        <div>
+          <h1><a href="/">MoneyMind</a></h1>
+          <p>All Transactions</p>
+        </div>
+        <button type="button" id="logout-button" class="logout-button">Log out</button>
+      </div>
+    </header>
 
-            <!-- Preview & Review Container -->
-            <div id="preview-section" style="display: none; margin-top: 20px;">
-                <h4>Review Extracted Transactions</h4>
-                <p>Verify details or fix any flagged fields before saving.</p>
-                <table class="data-table" id="preview-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Description</th>
-                            <th>Amount (???????)</th>
-                            <th>Type</th>
-                            <th>Category</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="preview-list"></tbody>
-                </table>
-                <div style="margin-top: 15px;">
-                    <button type="button" id="confirm-import-btn" class="btn-primary">Confirm & Save All</button>
-                    <button type="button" id="cancel-import-btn">Cancel</button>
-                </div>
-            </div>
-        </section>
+    <main class="dashboard">
+      <section class="transactions-section">
+        <div class="section-heading">
+          <h2>All Transactions</h2>
+          <p>View and manage your income and expenses</p>
+        </div>
 
-        <section class="card" style="margin-top: 20px;">
-            <h3>Transaction History</h3>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Description</th>
-                        <th>Category</th>
-                        <th>Type</th>
-                        <th>Amount</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="transaction-list"></tbody>
-            </table>
-        </section>
-    </div>
+        <p id="transactions-message" class="message" hidden></p>
 
-    <script src="../js/script.js"></script>
-    <script src="../js/transaction.js"></script>
-</body>
+        <div class="transactions-list">
+          <p class="empty-state">Loading transactions...</p>
+        </div>
+
+        <div class="form-actions">
+          <button id="refresh-transactions" type="button" class="primary-button">
+            Refresh Transactions
+          </button>
+          <a href="/" class="secondary-button">Back to Dashboard</a>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="edit-dialog">
+      <form id="edit-form">
+        <h2>Update transaction</h2>
+        <input type="hidden" id="edit-id" />
+
+        <div class="form-field">
+          <label for="edit-description">Description</label>
+          <input type="text" id="edit-description" maxlength="255" required />
+        </div>
+
+        <div class="form-field">
+          <label for="edit-amount">Amount (₹)</label>
+          <input type="number" id="edit-amount" min="0.01" step="0.01" required />
+        </div>
+
+        <div class="form-field">
+          <label for="edit-category">Category</label>
+          <select id="edit-category" required>
+            <option value="Food">Food</option>
+            <option value="Travel">Travel</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Bills">Bills</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label for="edit-date">Date</label>
+          <input type="date" id="edit-date" required />
+        </div>
+
+        <div class="form-field">
+          <label for="edit-type">Type</label>
+          <select id="edit-type" required>
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+          </select>
+        </div>
+
+        <p id="edit-message" class="message" hidden></p>
+
+        <div class="form-actions">
+          <button type="submit" id="edit-save" class="primary-button">Save</button>
+          <button type="button" id="edit-cancel" class="secondary-button">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <footer>
+      <p>MoneyMind</p>
+    </footer>
+
+    <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/transaction.js"></script>
+  </body>
 </html>
