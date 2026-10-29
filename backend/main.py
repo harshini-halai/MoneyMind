@@ -1,194 +1,266 @@
-﻿import os
-from io import BytesIO
-from typing import Literal, List, Optional
-from datetime import date
+﻿import datetime as dt
+import logging
+import os
+import re
+import time
+from collections import defaultdict, deque
+from pathlib import Path
+from typing import Annotated, Literal
 
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
-from fastapi.responses import FileResponse
+import mysql.connector
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
-from PIL import Image
+from pydantic import BaseModel, Field, StringConstraints, field_validator
 
 from backend.database import get_connection
 from backend.security import (
+    create_access_token,
+    fake_verify_password,
+    get_current_user,
     hash_password,
     verify_password,
-    create_access_token,
-    get_current_user,
-)
-from backend.transaction_ocr import extract_transactions_from_image
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
-app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("moneymind")
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+TEMPLATES_DIR = FRONTEND_DIR / "templates"
+
+app = FastAPI(title="MoneyMind")
+
+# The frontend is served by this same app, so CORS is not needed by default.
+# Set ALLOWED_ORIGINS="https://example.com,https://app.example.com" only if
+# you host the frontend somewhere else.
+_allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if _allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_allowed_origins,
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
+
+app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR), name="frontend")
+
 
 # -------------------- DATABASE HELPERS --------------------
 
 def fetch_all(query, params=()):
     connection = None
+    cursor = None
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
         cursor.execute(query, params)
-        rows = cursor.fetchall()
-        cursor.close()
-        return rows
+        return cursor.fetchall()
     finally:
+        if cursor:
+            cursor.close()
         if connection and connection.is_connected():
             connection.close()
+
 
 def fetch_one(query, params=()):
     connection = None
+    cursor = None
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
         cursor.execute(query, params)
-        row = cursor.fetchone()
-        cursor.close()
-        return row
+        return cursor.fetchone()
     finally:
+        if cursor:
+            cursor.close()
         if connection and connection.is_connected():
             connection.close()
 
+
 def execute_write(query, params=()):
     connection = None
+    cursor = None
     try:
         connection = get_connection()
         cursor = connection.cursor()
         cursor.execute(query, params)
         connection.commit()
-        last_id = cursor.lastrowid
-        cursor.close()
-        return last_id
+        return cursor.rowcount, cursor.lastrowid
+    except Exception:
+        if connection and connection.is_connected():
+            connection.rollback()
+        raise
     finally:
+        if cursor:
+            cursor.close()
         if connection and connection.is_connected():
             connection.close()
 
-# -------------------- PYDANTIC MODELS --------------------
 
-class User(BaseModel):
-    name: Optional[str] = "User"
-    email: Optional[str] = None
-    username: Optional[str] = None
-    password: str
+def server_error(message: str) -> HTTPException:
+    """Log the real exception (call inside `except`) and return a safe 500."""
+    logger.exception(message)
+    return HTTPException(status_code=500, detail=message)
 
-    def get_identifier(self) -> str:
-        ident = self.email or self.username or ""
-        if not ident:
-            raise ValueError("email or username is required")
-        if "@" not in ident:
-            return f"{ident}@moneymind.local"
-        return ident
+
+# -------------------- MODELS --------------------
+
+Category = Literal["Food", "Travel", "Shopping", "Bills", "Other"]
+Money = Annotated[float, Field(gt=0, lt=10_000_000_000)]
+Text = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+]
+
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
 
 class Transaction(BaseModel):
-    description: str
-    category: Literal["Food", "Travel", "Shopping", "Bills", "Other"]
-    amount: float = Field(gt=0)
-    date: date
-    type: Literal["expense", "income"]
+    description: Text
+    category: Category
+    amount: Money
+    date: dt.date
+    type: Literal["income", "expense"]
 
-class SavingsGoal(BaseModel):
-    goal_name: str
-    target_amount: float = Field(gt=0)
-    saved_amount: float = Field(ge=0)
+
+class Saving(BaseModel):
+    amount: Money
+    description: Text
+    date: dt.date
+
 
 class EmergencyFund(BaseModel):
-    target_months: int = Field(gt=0)
-    monthly_expense: float = Field(gt=0)
-    current_amount: float = Field(ge=0)
+    amount: Money
+    description: Text
+    date: dt.date
+
 
 class UpcomingExpense(BaseModel):
-    title: str
-    amount: float = Field(gt=0)
-    due_date: date
+    amount: Money
+    description: Text
+    due_date: dt.date
+
 
 class Budget(BaseModel):
-    category: Literal["Food", "Travel", "Shopping", "Bills", "Other"]
-    monthly_limit: float = Field(gt=0)
+    category: Category
+    amount: Money
+    month: dt.date
+
+
+class UserCreate(BaseModel):
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+    ]
+    email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)]
+    password: Annotated[str, Field(min_length=8, max_length=128)]
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        value = value.lower()
+        if not EMAIL_PATTERN.match(value):
+            raise ValueError("Enter a valid email address")
+        return value
+
+
+class UserLogin(BaseModel):
+    email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)]
+    password: Annotated[str, Field(min_length=1, max_length=128)]
+
+
+# -------------------- LOGIN RATE LIMIT (in-memory, single process) --------------------
+
+MAX_LOGIN_FAILURES = 5
+LOGIN_WINDOW_SECONDS = 15 * 60
+_login_failures: dict[str, deque] = defaultdict(deque)
+
+
+def _login_key(request: Request, email: str) -> str:
+    client = request.client.host if request.client else "unknown"
+    return f"{client}|{email}"
+
+
+def _check_login_limit(key: str) -> None:
+    now = time.time()
+    attempts = _login_failures.get(key)
+    if not attempts:
+        return
+    while attempts and now - attempts[0] > LOGIN_WINDOW_SECONDS:
+        attempts.popleft()
+    if not attempts:
+        _login_failures.pop(key, None)
+        return
+    if len(attempts) >= MAX_LOGIN_FAILURES:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed attempts. Please try again in a few minutes.",
+        )
+
+
+def _record_login_failure(key: str) -> None:
+    _login_failures[key].append(time.time())
+
 
 # -------------------- FRONTEND PAGES --------------------
 
+def page(name: str) -> FileResponse:
+    return FileResponse(TEMPLATES_DIR / name)
+
+
 @app.get("/")
 def home():
-    return FileResponse("frontend/templates/index.html")
+    return page("index.html")
+
+
+@app.get("/login")
+def login_page():
+    return page("login.html")
+
+
+@app.get("/register")
+def register_page():
+    return page("register.html")
+
 
 @app.get("/add-income")
 def add_income_page():
-    return FileResponse("frontend/templates/add-income.html")
+    return page("add-income.html")
+
 
 @app.get("/add-expense")
 def add_expense_page():
-    return FileResponse("frontend/templates/add-expense.html")
+    return page("add-expense.html")
+
 
 @app.get("/transactions-page")
 def transactions_page():
-    return FileResponse("frontend/templates/transactions.html")
+    return page("transactions.html")
+
 
 @app.get("/add-savings")
 def add_savings_page():
-    return FileResponse("frontend/templates/add-savings.html")
+    return page("add-savings.html")
+
 
 @app.get("/add-emergency-fund")
 def add_emergency_fund_page():
-    return FileResponse("frontend/templates/add-emergency-fund.html")
+    return page("add-emergency-fund.html")
+
 
 @app.get("/add-budget")
 def add_budget_page():
-    return FileResponse("frontend/templates/add-budget.html")
+    return page("add-budget.html")
 
-@app.get("/login-page")
-def login_page():
-    return FileResponse("frontend/templates/login.html")
 
-# -------------------- AUTHENTICATION --------------------
+@app.get("/add-upcoming-expense")
+def add_upcoming_expense_page():
+    return page("add-upcoming-expense.html")
 
-@app.post("/register")
-def register(user: User):
-    try:
-        user_email = user.get_identifier()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    existing_user = fetch_one(
-        "SELECT id FROM users WHERE email = %s",
-        (user_email,),
-    )
-    if existing_user:
-        raise HTTPException(status_code=400, detail="User already exists")
-
-    hashed_pw = hash_password(user.password)
-    user_name = user.name if user.name != "User" else (user.username or user_email.split("@")[0])
-    execute_write(
-        "INSERT INTO users (name, email, password_hash) VALUES (%s, %s, %s)",
-        (user_name, user_email, hashed_pw),
-    )
-    return {"message": "User registered successfully"}
-
-@app.post("/login")
-def login(user: User):
-    try:
-        user_email = user.get_identifier()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    db_user = fetch_one(
-        "SELECT id, password_hash FROM users WHERE email = %s",
-        (user_email,),
-    )
-    if not db_user or not verify_password(user.password, db_user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-
-    token = create_access_token(int(db_user["id"]))
-    return {"access_token": token, "token_type": "bearer"}
 
 # -------------------- TRANSACTIONS --------------------
 
@@ -207,25 +279,32 @@ def create_transaction(
             (
                 transaction.description,
                 transaction.category,
-                transaction.amount,
-                str(transaction.date),
+                round(transaction.amount, 2),
+                transaction.date,
                 transaction.type,
                 user_id,
             ),
         )
         return {"message": "Transaction added successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to add transaction")
+
 
 @app.get("/transactions")
 def get_transactions(user_id: int = Depends(get_current_user)):
     try:
         return fetch_all(
-            "SELECT * FROM transactions WHERE user_id = %s ORDER BY date DESC",
+            """
+            SELECT id, description, category, amount, date, type
+            FROM transactions
+            WHERE user_id = %s
+            ORDER BY date DESC, id DESC
+            """,
             (user_id,),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to fetch transactions")
+
 
 @app.put("/transactions/{transaction_id}")
 def update_transaction(
@@ -234,34 +313,40 @@ def update_transaction(
     user_id: int = Depends(get_current_user),
 ):
     try:
-        existing = fetch_one(
-            "SELECT id FROM transactions WHERE id = %s AND user_id = %s",
-            (transaction_id, user_id),
-        )
-        if not existing:
-            raise HTTPException(status_code=404, detail="Transaction not found")
-
-        execute_write(
+        rowcount, _ = execute_write(
             """
             UPDATE transactions
-            SET description = %s, category = %s, amount = %s, date = %s, type = %s
+            SET description = %s, category = %s, amount = %s,
+                date = %s, type = %s
             WHERE id = %s AND user_id = %s
             """,
             (
                 transaction.description,
                 transaction.category,
-                transaction.amount,
-                str(transaction.date),
+                round(transaction.amount, 2),
+                transaction.date,
                 transaction.type,
                 transaction_id,
                 user_id,
             ),
         )
+
+        # MySQL reports 0 changed rows when nothing actually changed, so
+        # check that the row exists before calling it a 404.
+        if rowcount == 0:
+            exists = fetch_one(
+                "SELECT id FROM transactions WHERE id = %s AND user_id = %s",
+                (transaction_id, user_id),
+            )
+            if not exists:
+                raise HTTPException(status_code=404, detail="Transaction not found")
+
         return {"message": "Transaction updated successfully"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to update transaction")
+
 
 @app.delete("/transactions/{transaction_id}")
 def delete_transaction(
@@ -269,315 +354,428 @@ def delete_transaction(
     user_id: int = Depends(get_current_user),
 ):
     try:
-        existing = fetch_one(
-            "SELECT id FROM transactions WHERE id = %s AND user_id = %s",
-            (transaction_id, user_id),
-        )
-        if not existing:
-            raise HTTPException(status_code=404, detail="Transaction not found")
-
-        execute_write(
+        rowcount, _ = execute_write(
             "DELETE FROM transactions WHERE id = %s AND user_id = %s",
             (transaction_id, user_id),
         )
+        if rowcount == 0:
+            raise HTTPException(status_code=404, detail="Transaction not found")
         return {"message": "Transaction deleted successfully"}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# -------------------- SCREENSHOT IMPORT --------------------
-
-@app.post("/transactions/import-screenshot")
-async def import_screenshot_preview(
-    file: UploadFile = File(...),
-    user_id: int = Depends(get_current_user),
-):
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="uploaded file is not an image")
-
-    contents = await file.read()
-    try:
-        img = Image.open(BytesIO(contents))
     except Exception:
-        raise HTTPException(status_code=400, detail="invalid image format")
+        raise server_error("Unable to delete transaction")
 
-    extracted_items = extract_transactions_from_image(img)
-    return {"transactions": extracted_items}
 
-@app.post("/transactions/confirm-import")
-def confirm_imported_transactions(
-    items: List[Transaction],
-    user_id: int = Depends(get_current_user),
-):
-    saved_count = 0
-    for item in items:
-        execute_write(
-            """
-            INSERT INTO transactions
-            (description, category, amount, date, type, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """,
-            (
-                item.description,
-                item.category,
-                item.amount,
-                str(item.date),
-                item.type,
-                user_id,
-            ),
-        )
-        saved_count += 1
-
-    return {"message": "transactions imported successfully", "count": saved_count}
-
-# -------------------- SAVINGS --------------------
+# -------------------- PROTECTED SAVINGS --------------------
 
 @app.post("/savings")
-def create_savings_goal(
-    goal: SavingsGoal,
+def create_saving(
+    saving: Saving,
     user_id: int = Depends(get_current_user),
 ):
     try:
         execute_write(
             """
-            INSERT INTO savings_goals
-            (goal_name, target_amount, saved_amount, user_id)
+            INSERT INTO savings (amount, description, date, user_id)
             VALUES (%s, %s, %s, %s)
             """,
-            (goal.goal_name, goal.target_amount, goal.saved_amount, user_id),
+            (round(saving.amount, 2), saving.description, saving.date, user_id),
         )
-        return {"message": "Savings goal added successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"message": "Saving added successfully"}
+    except Exception:
+        raise server_error("Unable to add saving")
+
 
 @app.get("/savings")
-def get_savings_goals(user_id: int = Depends(get_current_user)):
+def get_savings(user_id: int = Depends(get_current_user)):
     try:
         return fetch_all(
-            "SELECT * FROM savings_goals WHERE user_id = %s",
+            """
+            SELECT id, amount, description, date
+            FROM savings
+            WHERE user_id = %s
+            ORDER BY id DESC
+            """,
             (user_id,),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to fetch savings")
 
-@app.get("/savings/total")
-def get_total_savings(user_id: int = Depends(get_current_user)):
-    try:
-        row = fetch_one(
-            "SELECT COALESCE(SUM(saved_amount), 0) as total FROM savings_goals WHERE user_id = %s",
-            (user_id,),
-        )
-        return {"total_savings": float(row["total"]) if row else 0.0}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 # -------------------- EMERGENCY FUND --------------------
 
 @app.post("/emergency-fund")
-def set_emergency_fund(
+def create_emergency_fund(
     fund: EmergencyFund,
     user_id: int = Depends(get_current_user),
 ):
     try:
         execute_write(
             """
-            INSERT INTO emergency_funds
-            (target_months, monthly_expense, current_amount, user_id)
+            INSERT INTO emergency_fund (amount, description, date, user_id)
             VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-            target_months = VALUES(target_months),
-            monthly_expense = VALUES(monthly_expense),
-            current_amount = VALUES(current_amount)
             """,
-            (fund.target_months, fund.monthly_expense, fund.current_amount, user_id),
+            (round(fund.amount, 2), fund.description, fund.date, user_id),
         )
-        return {"message": "Emergency fund updated successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"message": "Emergency fund added successfully"}
+    except Exception:
+        raise server_error("Unable to add emergency fund")
+
 
 @app.get("/emergency-fund")
 def get_emergency_fund(user_id: int = Depends(get_current_user)):
     try:
-        fund = fetch_one(
-            "SELECT * FROM emergency_funds WHERE user_id = %s",
+        return fetch_all(
+            """
+            SELECT id, amount, description, date
+            FROM emergency_fund
+            WHERE user_id = %s
+            ORDER BY id DESC
+            """,
             (user_id,),
         )
-        return fund or {}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to fetch emergency fund")
 
-@app.get("/emergency-fund/total")
-def get_total_emergency_fund(user_id: int = Depends(get_current_user)):
-    try:
-        row = fetch_one(
-            "SELECT COALESCE(current_amount, 0) as total FROM emergency_funds WHERE user_id = %s",
-            (user_id,),
-        )
-        return {"total_emergency_fund": float(row["total"]) if row else 0.0}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 # -------------------- UPCOMING EXPENSES --------------------
 
 @app.post("/upcoming-expenses")
 def create_upcoming_expense(
-    expense_item: UpcomingExpense,
+    expense: UpcomingExpense,
     user_id: int = Depends(get_current_user),
 ):
     try:
         execute_write(
             """
             INSERT INTO upcoming_expenses
-            (title, amount, due_date, user_id)
+            (amount, description, due_date, user_id)
             VALUES (%s, %s, %s, %s)
             """,
-            (expense_item.title, expense_item.amount, str(expense_item.due_date), user_id),
+            (round(expense.amount, 2), expense.description, expense.due_date, user_id),
         )
         return {"message": "Upcoming expense added successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to add upcoming expense")
+
 
 @app.get("/upcoming-expenses")
 def get_upcoming_expenses(user_id: int = Depends(get_current_user)):
     try:
         return fetch_all(
-            "SELECT * FROM upcoming_expenses WHERE user_id = %s ORDER BY due_date ASC",
+            """
+            SELECT id, amount, description, due_date
+            FROM upcoming_expenses
+            WHERE user_id = %s
+            ORDER BY due_date ASC
+            """,
             (user_id,),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to fetch upcoming expenses")
+
 
 @app.get("/upcoming-expenses/total")
 def get_total_upcoming_expenses(user_id: int = Depends(get_current_user)):
     try:
-        row = fetch_one(
-            "SELECT COALESCE(SUM(amount), 0) as total FROM upcoming_expenses WHERE user_id = %s",
+        result = fetch_one(
+            """
+            SELECT COALESCE(SUM(amount), 0) AS total
+            FROM upcoming_expenses
+            WHERE user_id = %s
+            """,
             (user_id,),
         )
-        return {"total_upcoming_expenses": float(row["total"]) if row else 0.0}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"upcoming_expenses": float(result["total"])}
+    except Exception:
+        raise server_error("Unable to fetch total upcoming expenses")
+
 
 # -------------------- BALANCE & SAFE TO SPEND --------------------
+
+def calculate_finances(user_id: int):
+    transactions = fetch_one(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0)
+                AS total_income,
+            COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0)
+                AS total_expenses
+        FROM transactions
+        WHERE user_id = %s
+        """,
+        (user_id,),
+    )
+
+    savings = fetch_one(
+        "SELECT COALESCE(SUM(amount), 0) AS total FROM savings WHERE user_id = %s",
+        (user_id,),
+    )
+
+    emergency = fetch_one(
+        """
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM emergency_fund WHERE user_id = %s
+        """,
+        (user_id,),
+    )
+
+    # Only upcoming expenses due in the next 30 days reduce safe-to-spend.
+    upcoming = fetch_one(
+        """
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM upcoming_expenses
+        WHERE user_id = %s
+          AND due_date BETWEEN CURRENT_DATE
+          AND DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY)
+        """,
+        (user_id,),
+    )
+
+    income = float(transactions["total_income"])
+    expenses = float(transactions["total_expenses"])
+    protected_savings = float(savings["total"])
+    emergency_fund = float(emergency["total"])
+    upcoming_expenses = float(upcoming["total"])
+
+    balance = income - expenses - protected_savings - emergency_fund
+
+    return {
+        "total_income": round(income, 2),
+        "total_expenses": round(expenses, 2),
+        "protected_savings": round(protected_savings, 2),
+        "emergency_fund": round(emergency_fund, 2),
+        "upcoming_expenses": round(upcoming_expenses, 2),
+        "balance": round(balance, 2),
+        "safe_to_spend": round(balance - upcoming_expenses, 2),
+    }
+
 
 @app.get("/balance")
 def get_balance(user_id: int = Depends(get_current_user)):
     try:
-        income_row = fetch_one(
-            "SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE user_id = %s AND type = 'income'",
-            (user_id,),
-        )
-        expense_row = fetch_one(
-            "SELECT COALESCE(SUM(amount), 0) as total FROM transactions WHERE user_id = %s AND type = 'expense'",
-            (user_id,),
-        )
-        income = float(income_row["total"])
-        expense_amt = float(expense_row["total"])
+        result = calculate_finances(user_id)
         return {
-            "total_income": income,
-            "total_expense": expense_amt,
-            "balance": income - expense_amt,
+            "total_income": result["total_income"],
+            "total_expenses": result["total_expenses"],
+            "protected_savings": result["protected_savings"],
+            "emergency_fund": result["emergency_fund"],
+            "balance": result["balance"],
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to fetch balance")
+
 
 @app.get("/safe-to-spend")
 def get_safe_to_spend(user_id: int = Depends(get_current_user)):
     try:
-        balance_data = get_balance(user_id=user_id)
-        current_balance = balance_data["balance"]
-
-        upcoming_row = fetch_one(
-            "SELECT COALESCE(SUM(amount), 0) as total FROM upcoming_expenses WHERE user_id = %s",
-            (user_id,),
-        )
-        upcoming_total = float(upcoming_row["total"]) if upcoming_row else 0.0
-
-        safe_amount = max(0.0, current_balance - upcoming_total)
+        result = calculate_finances(user_id)
         return {
-            "current_balance": current_balance,
-            "upcoming_commitments": upcoming_total,
-            "safe_to_spend": safe_amount,
+            "available_balance": result["balance"],
+            "upcoming_expenses": result["upcoming_expenses"],
+            "safe_to_spend": result["safe_to_spend"],
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to calculate safe-to-spend")
+
 
 # -------------------- BUDGETS --------------------
 
 @app.post("/budgets")
-def set_budget(
+def create_budget(
     budget: Budget,
     user_id: int = Depends(get_current_user),
 ):
     try:
+        month_start = budget.month.replace(day=1)
+
+        existing = fetch_one(
+            """
+            SELECT id FROM budgets
+            WHERE user_id = %s AND category = %s
+              AND YEAR(month) = %s AND MONTH(month) = %s
+            """,
+            (user_id, budget.category, month_start.year, month_start.month),
+        )
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail="A budget for this category and month already exists",
+            )
+
         execute_write(
             """
-            INSERT INTO budgets (category, monthly_limit, user_id)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE monthly_limit = VALUES(monthly_limit)
+            INSERT INTO budgets (category, amount, month, user_id)
+            VALUES (%s, %s, %s, %s)
             """,
-            (budget.category, budget.monthly_limit, user_id),
+            (budget.category, round(budget.amount, 2), month_start, user_id),
         )
-        return {"message": "Budget set successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"message": "Budget added successfully"}
+    except HTTPException:
+        raise
+    except Exception:
+        raise server_error("Unable to add budget")
+
 
 @app.get("/budgets")
 def get_budgets(user_id: int = Depends(get_current_user)):
     try:
         return fetch_all(
-            "SELECT * FROM budgets WHERE user_id = %s",
+            """
+            SELECT id, category, amount, month
+            FROM budgets
+            WHERE user_id = %s
+            ORDER BY month DESC
+            """,
             (user_id,),
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to fetch budgets")
+
 
 @app.get("/budgets/analysis")
 def get_budget_analysis(user_id: int = Depends(get_current_user)):
     try:
         budgets = fetch_all(
-            "SELECT * FROM budgets WHERE user_id = %s",
+            """
+            SELECT
+                b.id,
+                b.category,
+                b.month,
+                b.amount AS budget,
+                COALESCE(SUM(t.amount), 0) AS spent
+            FROM budgets b
+            LEFT JOIN transactions t
+                ON b.category = t.category
+                AND t.type = 'expense'
+                AND t.user_id = b.user_id
+                AND YEAR(t.date) = YEAR(b.month)
+                AND MONTH(t.date) = MONTH(b.month)
+            WHERE b.user_id = %s
+            GROUP BY b.id, b.category, b.month, b.amount
+            ORDER BY b.month DESC, b.category
+            """,
             (user_id,),
         )
-        analysis_data = []
-        for b in budgets:
-            cat = b["category"]
-            limit_val = float(b["monthly_limit"])
-            spent_row = fetch_one(
-                """
-                SELECT COALESCE(SUM(amount), 0) as spent
-                FROM transactions
-                WHERE user_id = %s AND category = %s AND type = 'expense'
-                """,
-                (user_id, cat),
-            )
-            spent_val = float(spent_row["spent"])
-            analysis_data.append({
-                "category": cat,
-                "monthly_limit": limit_val,
-                "spent": spent_val,
-                "remaining": limit_val - spent_val,
-                "over_budget": spent_val > limit_val,
-            })
-        return analysis_data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
-# -------------------- CATEGORIES & KHATA SUMMARY --------------------
+        for item in budgets:
+            item["budget"] = float(item["budget"])
+            item["spent"] = float(item["spent"])
+            item["remaining"] = round(item["budget"] - item["spent"], 2)
+            item["percent_used"] = (
+                round(item["spent"] / item["budget"] * 100, 1)
+                if item["budget"] > 0
+                else 0
+            )
+
+        return budgets
+    except Exception:
+        raise server_error("Unable to analyze budgets")
+
+
+# -------------------- CATEGORIES --------------------
 
 @app.get("/categories")
-def get_categories():
-    return {"categories": ["Food", "Travel", "Shopping", "Bills", "Other"]}
+def get_categories(user_id: int = Depends(get_current_user)):
+    try:
+        categories = fetch_all(
+            """
+            SELECT category, SUM(amount) AS total
+            FROM transactions
+            WHERE type = 'expense' AND user_id = %s
+            GROUP BY category
+            """,
+            (user_id,),
+        )
+        for category in categories:
+            category["total"] = float(category["total"])
+        return categories
+    except Exception:
+        raise server_error("Unable to fetch category totals")
+
+
+# -------------------- KHATA SUMMARY --------------------
 
 @app.get("/khata/summary")
-def get_khata_summary(user_id: int = Depends(get_current_user)):
+def khata_summary(user_id: int = Depends(get_current_user)):
     try:
-        balance_info = get_balance(user_id=user_id)
-        budget_info = get_budget_analysis(user_id=user_id)
+        result = calculate_finances(user_id)
+
+        category_spending = fetch_all(
+            """
+            SELECT category, COALESCE(SUM(amount), 0) AS total
+            FROM transactions
+            WHERE type = 'expense' AND user_id = %s
+            GROUP BY category
+            ORDER BY total DESC
+            """,
+            (user_id,),
+        )
+
+        for category in category_spending:
+            category["total"] = float(category["total"])
+
         return {
-            "balance": balance_info,
-            "budgets": budget_info,
+            "balance": result["balance"],
+            "income": result["total_income"],
+            "expenses": result["total_expenses"],
+            "protected_savings": result["protected_savings"],
+            "emergency_fund": result["emergency_fund"],
+            "safe_to_spend": result["safe_to_spend"],
+            "upcoming_expenses": result["upcoming_expenses"],
+            "category_spending": category_spending,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise server_error("Unable to fetch Khata summary")
+
+
+# -------------------- AUTHENTICATION --------------------
+
+@app.post("/register")
+def register_user(user: UserCreate):
+    try:
+        hashed_password = hash_password(user.password)
+        execute_write(
+            """
+            INSERT INTO users (name, email, password_hash)
+            VALUES (%s, %s, %s)
+            """,
+            (user.name, user.email, hashed_password),
+        )
+        return {"message": "User registered successfully"}
+    except mysql.connector.IntegrityError:
+        raise HTTPException(
+            status_code=409, detail="An account with this email already exists"
+        )
+    except Exception:
+        raise server_error("Unable to register user")
+
+
+@app.post("/login")
+def login_user(user: UserLogin, request: Request):
+    email = user.email.lower()
+    key = _login_key(request, email)
+    _check_login_limit(key)
+
+    try:
+        db_user = fetch_one(
+            "SELECT id, password_hash FROM users WHERE email = %s",
+            (email,),
+        )
+    except Exception:
+        raise server_error("Unable to log in")
+
+    if db_user:
+        valid = verify_password(user.password, db_user["password_hash"])
+    else:
+        fake_verify_password(user.password)  # keep timing similar
+        valid = False
+
+    if not valid:
+        _record_login_failure(key)
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    _login_failures.pop(key, None)
+    token = create_access_token(db_user["id"])
+    return {"access_token": token, "token_type": "bearer"}
