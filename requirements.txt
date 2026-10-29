@@ -3,11 +3,19 @@ uvicorn
 pydantic
 mysql-connector-python
 python-dotenv
-pandas
-numpy
-scikit-learn
 pwdlib[argon2]
 PyJWT
-Pillow
+
+# Screenshot import (backend/transaction_ocr.py). Also install the Tesseract
+# program itself and set TESSERACT_CMD in .env if it is not on your PATH.
 pytesseract
-pytest
+Pillow
+
+# Needed once the screenshot upload endpoint (UploadFile) is added:
+# python-multipart
+
+# Planned for Khata AI/ML features - not used by any code yet:
+# pandas
+# numpy
+# scikit-learn
+# openai
