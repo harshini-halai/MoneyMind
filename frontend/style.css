@@ -4,11 +4,21 @@
   padding: 0;
 }
 
+/* Without this, rules like .message { display: block } would override the
+   hidden attribute and empty message boxes would stay visible. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: Arial, sans-serif;
   background: #eef4f8;
   color: #1f2937;
   line-height: 1.5;
+}
+
+a {
+  color: #2f80ed;
 }
 
 /* Header */
@@ -25,14 +35,36 @@ body {
   margin: auto;
 }
 
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
 .header h1 {
   font-size: 30px;
   margin-bottom: 4px;
 }
 
+.header h1 a {
+  color: inherit;
+  text-decoration: none;
+}
+
 .header p {
   color: #cbd8e3;
   font-size: 15px;
+}
+
+.logout-button {
+  background: transparent;
+  color: white;
+  border: 1px solid #cbd8e3;
+}
+
+.logout-button:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* Main Dashboard */
@@ -59,7 +91,7 @@ section {
 }
 
 .section-heading p {
-  color: #777;
+  color: #6b7280;
   font-size: 14px;
 }
 
@@ -91,6 +123,17 @@ section {
   font-weight: bold;
   margin-top: 10px;
   color: #17324d;
+  overflow-wrap: anywhere;
+}
+
+.summary-card .amount.negative {
+  color: #b42318;
+}
+
+.card-note {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6b7280;
 }
 
 /* Common Sections */
@@ -98,7 +141,10 @@ section {
 .quick-actions,
 .transactions-section,
 .goals-section,
-.khata-section {
+.khata-section,
+.budgets-section,
+.spending-analysis-section,
+.form-card {
   background: white;
   padding: 24px;
   border-radius: 12px;
@@ -106,10 +152,11 @@ section {
   box-shadow: 0 2px 8px rgba(23, 50, 77, 0.05);
 }
 
-/* Quick Actions */
+/* Buttons */
 
 .action-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -122,10 +169,24 @@ button,
   font-size: 14px;
   text-decoration: none;
   display: inline-block;
+  font-family: inherit;
 }
 
 button {
   border: none;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #9cc3f7;
+  outline-offset: 2px;
 }
 
 .primary-button {
@@ -138,29 +199,122 @@ button {
   color: #176b3a;
 }
 
+/* Forms */
+
+.form-card {
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.form-field {
+  margin-bottom: 16px;
+}
+
+.form-field label {
+  display: block;
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 15px;
+  font-family: inherit;
+  border: 1px solid #c4d0da;
+  border-radius: 7px;
+  background: white;
+  color: #1f2937;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* Messages */
+
+.message {
+  margin: 14px 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  font-size: 14px;
+}
+
+.message.error {
+  background: #fce8e8;
+  color: #a33a3a;
+  border: 1px solid #f3c2c2;
+}
+
+.message.success {
+  background: #dff3e7;
+  color: #176b3a;
+  border: 1px solid #b8e2c8;
+}
+
+/* Login / register */
+
+.auth-page .form-card {
+  margin-top: 20px;
+}
+
+.auth-alt {
+  margin-top: 18px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
 /* Transactions */
 
 .transactions-list {
   margin-bottom: 18px;
 }
 
-.transactions-list > div {
+.transaction-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 16px;
   padding: 14px 0;
   border-bottom: 1px solid #e5e7eb;
 }
 
-.transactions-list > div:last-child {
+.transaction-item:last-child {
   border-bottom: none;
 }
 
-.transactions-list p {
-  margin-bottom: 4px;
+.transaction-main strong {
+  display: block;
+  overflow-wrap: anywhere;
 }
 
-.update-button,
-.delete-button {
-  margin-top: 8px;
-  margin-right: 6px;
+.transaction-meta {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.transaction-amount {
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.transaction-amount.income {
+  color: #176b3a;
+}
+
+.transaction-amount.expense {
+  color: #b42318;
+}
+
+.transaction-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .update-button {
@@ -173,11 +327,74 @@ button {
   color: #a33a3a;
 }
 
+/* Edit dialog */
+
+dialog {
+  margin: auto;
+  width: min(480px, 92vw);
+  padding: 24px;
+  border: 1px solid #d8e2ea;
+  border-radius: 12px;
+}
+
+dialog::backdrop {
+  background: rgba(23, 50, 77, 0.45);
+}
+
+dialog h2 {
+  margin-bottom: 16px;
+  font-size: 20px;
+}
+
 /* Empty States */
 
 .empty-state {
-  color: #777;
+  color: #6b7280;
   padding: 10px 0;
+}
+
+/* Budgets */
+
+.budget-item {
+  padding: 14px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.budget-item:last-child {
+  border-bottom: none;
+}
+
+.progress {
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #2f80ed;
+}
+
+.progress-fill.warn {
+  background: #f2a900;
+}
+
+.progress-fill.over {
+  background: #d92d20;
+}
+
+.budget-details {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* Spending chart */
+
+.chart-container {
+  max-width: 380px;
+  margin: 0 auto;
 }
 
 /* Goals */
@@ -221,7 +438,7 @@ button {
 footer {
   padding: 20px 40px;
   text-align: center;
-  color: #777;
+  color: #6b7280;
   font-size: 14px;
 }
 
@@ -238,6 +455,14 @@ footer {
 
   .header {
     padding: 22px 20px;
+  }
+
+  .transaction-item {
+    grid-template-columns: 1fr auto;
+  }
+
+  .transaction-actions {
+    grid-column: 1 / -1;
   }
 }
 
@@ -259,7 +484,9 @@ footer {
     text-align: center;
   }
 
-  button {
+  .form-actions button,
+  .form-actions a {
     width: 100%;
+    text-align: center;
   }
 }
