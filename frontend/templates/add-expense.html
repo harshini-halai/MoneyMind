@@ -1,9 +1,6 @@
 ﻿<!doctype html>
-
 <html lang="en">
   <head>
-    <script src="/frontend/js/auth.js"></script>
-
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -12,59 +9,63 @@
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
-  <body>
+  <body data-auth="required">
     <header class="header">
-    <script src="/frontend/js/auth.js"></script>
-
-      <div class="header-content">
-        <h1>MoneyMind</h1>
-        <p>Add Expense</p>
+      <div class="header-content header-row">
+        <div>
+          <h1><a href="/">MoneyMind</a></h1>
+          <p>Add Expense</p>
+        </div>
+        <button type="button" id="logout-button" class="logout-button">Log out</button>
       </div>
     </header>
 
     <main class="dashboard">
-      <section class="transaction-form-section">
+      <section class="form-card">
         <div class="section-heading">
           <h2>Add Expense</h2>
           <p>Record money you spent</p>
         </div>
 
         <form id="expense-form">
-          <input
-            type="text"
-            id="expense-description"
-            placeholder="Description"
-            required
-          />
+          <div class="form-field">
+            <label for="expense-description">Description</label>
+            <input type="text" id="expense-description" placeholder="e.g. Lunch" maxlength="255" required />
+          </div>
 
-          <select id="expense-category" required>
-            <option value="">Select Category</option>
-            <option value="Food">Food</option>
-            <option value="Travel">Travel</option>
-            <option value="Shopping">Shopping</option>
-            <option value="Bills">Bills</option>
-            <option value="Other">Other</option>
-          </select>
+          <div class="form-field">
+            <label for="expense-category">Category</label>
+            <select id="expense-category" required>
+              <option value="">Select category</option>
+              <option value="Food">Food</option>
+              <option value="Travel">Travel</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Bills">Bills</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
 
-          <input
-            type="number"
-            id="expense-amount"
-            placeholder="Amount"
-            min="1"
-            required
-          />
+          <div class="form-field">
+            <label for="expense-amount">Amount (₹)</label>
+            <input type="number" id="expense-amount" placeholder="0.00" min="0.01" step="0.01" required />
+          </div>
 
-          <input type="date" id="expense-date" required />
+          <div class="form-field">
+            <label for="expense-date">Date</label>
+            <input type="date" id="expense-date" required />
+          </div>
 
-          <button type="submit" class="secondary-button">Save Expense</button>
-
-          <a href="/" class="primary-button"> Cancel </a>
+          <div class="form-actions">
+            <button type="submit" class="primary-button">Save Expense</button>
+            <a href="/" class="secondary-button">Cancel</a>
+          </div>
         </form>
 
-        <p id="expense-message"></p>
+        <p id="expense-message" class="message" hidden></p>
       </section>
     </main>
 
+    <script src="/frontend/js/api.js"></script>
     <script src="/frontend/js/transaction.js"></script>
   </body>
 </html>
