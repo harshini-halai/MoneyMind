@@ -1,122 +1,110 @@
-async function loadBalance() {
-  try {
-    const response = await fetch("http://127.0.0.1:8000/balance");
-    const data = await response.json();
+// Dashboard (index.html): one request fills the whole overview.
 
-    document.getElementById("balance").textContent = `₹${data.balance}`;
-    document.getElementById("total-income").textContent =
-      `₹${data.total_income}`;
-    document.getElementById("total-expenses").textContent =
-      `₹${data.total_expenses}`;
-  } catch (error) {
-    console.log("Unable to load balance");
+function renderSpendingChart(categories) {
+  const canvas = document.getElementById("spending-chart");
+  const emptyState = document.getElementById("chart-empty");
+  if (!canvas) {
+    return;
   }
-}
 
-loadBalance();
-
-async function loadSavings() {
-  try {
-    const response = await fetch("http://127.0.0.1:8000/savings/total");
-
-    const data = await response.json();
-
-    document.getElementById("protected-savings").textContent =
-      `₹${data.protected_savings}`;
-  } catch (error) {
-    console.log("Unable to load savings");
-  }
-}
-
-loadSavings();
-
-async function loadEmergencyFund() {
-  try {
-    const response = await fetch("http://127.0.0.1:8000/emergency-fund/total");
-
-    const data = await response.json();
-
-    document.getElementById("emergency-fund").textContent =
-      `₹${data.emergency_fund}`;
-  } catch (error) {
-    console.log("Unable to load emergency fund");
-  }
-}
-
-loadEmergencyFund();
-
-async function loadSafeToSpend() {
-  try {
-    const response = await fetch("http://127.0.0.1:8000/safe-to-spend");
-
-    const data = await response.json();
-
-    document.getElementById("safe-to-spend").textContent =
-      `₹${data.safe_to_spend}`;
-    document.getElementById("upcoming-expenses-summary").textContent =
-      `Upcoming: ₹${data.upcoming_expenses}`;
-  } catch (error) {
-    console.log("Unable to load safe-to-spend");
-  }
-}
-
-loadSafeToSpend();
-
-async function loadSpendingChart() {
-  try {
-    const response = await fetch("http://127.0.0.1:8000/categories");
-
-    const categories = await response.json();
-
-    const chartCanvas = document.getElementById("spending-chart");
-
-    if (!chartCanvas) {
-      return;
+  if (!categories || categories.length === 0) {
+    canvas.hidden = true;
+    if (emptyState) {
+      emptyState.hidden = false;
     }
+    return;
+  }
 
-    const labels = categories.map(function (item) {
-      return item.category;
-    });
+  canvas.hidden = false;
+  if (emptyState) {
+    emptyState.hidden = true;
+  }
 
-    const amounts = categories.map(function (item) {
-      return item.total;
-    });
+  if (typeof Chart === "undefined") {
+    if (emptyState) {
+      emptyState.textContent = "Chart library could not be loaded.";
+      emptyState.hidden = false;
+    }
+    return;
+  }
 
-    new Chart(chartCanvas, {
-      type: "doughnut",
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            data: amounts,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: function (context) {
-                const total = context.dataset.data.reduce(function (
-                  sum,
-                  value,
-                ) {
-                  return sum + value;
-                }, 0);
+  const existing = Chart.getChart(canvas);
+  if (existing) {
+    existing.destroy();
+  }
 
-                const percentage = ((context.raw / total) * 100).toFixed(1);
-
-                return `${context.label}: ₹${context.raw} (${percentage}%)`;
-              },
+  new Chart(canvas, {
+    type: "doughnut",
+    data: {
+      labels: categories.map(function (item) {
+        return item.category;
+      }),
+      datasets: [
+        {
+          data: categories.map(function (item) {
+            return item.total;
+          }),
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              const total = context.dataset.data.reduce(function (sum, value) {
+                return sum + value;
+              }, 0);
+              const percentage = ((context.raw / total) * 100).toFixed(1);
+              return `${context.label}: ${formatMoney(context.raw)} (${percentage}%)`;
             },
           },
         },
       },
-    });
+    },
+  });
+}
+
+async function loadDashboard() {
+  try {
+    const result = await apiFetch("/khata/summary");
+
+    if (!result.ok) {
+      throw new Error(errorMessage(result.data, "Unable to load dashboard"));
+    }
+
+    const data = result.data;
+
+    setText("balance", formatMoney(data.balance));
+    setText("safe-to-spend", formatMoney(data.safe_to_spend));
+    setText(
+      "upcoming-expenses-summary",
+      `Upcoming (next 30 days): ${formatMoney(data.upcoming_expenses)}`,
+    );
+    setText("total-income", formatMoney(data.income));
+    setText("total-expenses", formatMoney(data.expenses));
+    setText("protected-savings", formatMoney(data.protected_savings));
+    setText("emergency-fund", formatMoney(data.emergency_fund));
+
+    const safe = document.getElementById("safe-to-spend");
+    if (safe) {
+      safe.classList.toggle("negative", data.safe_to_spend < 0);
+    }
+    const balance = document.getElementById("balance");
+    if (balance) {
+      balance.classList.toggle("negative", data.balance < 0);
+    }
+
+    renderSpendingChart(data.category_spending);
   } catch (error) {
-    console.log("Unable to load spending chart");
+    console.error(error);
+    showMessage(
+      "dashboard-message",
+      "Unable to load your dashboard. Please refresh the page.",
+      "error",
+    );
   }
 }
 
-loadSpendingChart();
+document.addEventListener("DOMContentLoaded", loadDashboard);
