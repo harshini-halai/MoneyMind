@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Create account - MoneyMind</title>
+
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body data-auth="guest" class="auth-page">
+    <header class="header">
+      <div class="header-content">
+        <h1>MoneyMind</h1>
+        <p>Manage Money, Build Savings</p>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="form-card auth-card">
+        <div class="section-heading">
+          <h2>Create your account</h2>
+          <p>Start tracking your money</p>
+        </div>
+
+        <form id="register-form">
+          <div class="form-field">
+            <label for="register-name">Name</label>
+            <input type="text" id="register-name" autocomplete="name" maxlength="100" required />
+          </div>
+
+          <div class="form-field">
+            <label for="register-email">Email</label>
+            <input type="email" id="register-email" autocomplete="email" maxlength="255" required />
+          </div>
+
+          <div class="form-field">
+            <label for="register-password">Password (at least 8 characters)</label>
+            <input type="password" id="register-password" autocomplete="new-password" minlength="8" maxlength="128" required />
+          </div>
+
+          <div class="form-field">
+            <label for="register-confirm">Confirm password</label>
+            <input type="password" id="register-confirm" autocomplete="new-password" minlength="8" maxlength="128" required />
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="primary-button">Create account</button>
+          </div>
+        </form>
+
+        <p id="auth-message" class="message" hidden></p>
+        <p class="auth-alt">Already have an account? <a href="/login">Log in</a></p>
+      </section>
+    </main>
+
+    <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/auth.js"></script>
+  </body>
+</html>
