@@ -6,14 +6,16 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Annotated, Literal
-
+import datetime as dt
+import io
+import logging
 import mysql.connector
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StringConstraints, field_validator
-
+from backend.transaction_parser import parse_transactions
 from backend.database import get_connection
 from backend.security import (
     create_access_token,
@@ -102,6 +104,26 @@ def execute_write(query, params=()):
         if connection and connection.is_connected():
             connection.close()
 
+def execute_many(query, rows):
+    """Run one INSERT for many rows inside a single transaction."""
+    connection = None
+    cursor = None
+    try:
+        connection = get_connection()
+        connection.start_transaction()
+        cursor = connection.cursor()
+        cursor.executemany(query, rows)
+        connection.commit()
+        return cursor.rowcount
+    except Exception:
+        if connection and connection.is_connected():
+            connection.rollback()
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if connection and connection.is_connected():
+            connection.close()
 
 def server_error(message: str) -> HTTPException:
     """Log the real exception (call inside `except`) and return a safe 500."""
@@ -172,6 +194,8 @@ class UserLogin(BaseModel):
     email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)]
     password: Annotated[str, Field(min_length=1, max_length=128)]
 
+class BulkTransactions(BaseModel):
+    transactions: list[Transaction] = Field(min_length=1, max_length=100)
 
 # -------------------- LOGIN RATE LIMIT (in-memory, single process) --------------------
 
@@ -366,6 +390,124 @@ def delete_transaction(
     except Exception:
         raise server_error("Unable to delete transaction")
 
+# -------------------- SCREENSHOT IMPORT --------------------
+
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_PIXELS = 25_000_000
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
+
+
+@app.post("/import/screenshot")
+def import_screenshot(
+    file: UploadFile = File(...),
+    default_type: Literal["income", "expense"] = Form("expense"),
+    user_id: int = Depends(get_current_user),
+):
+    """Read a payment-app screenshot and return DRAFT transactions.
+
+    Nothing is saved here and the image is never written to disk: the user
+    reviews the drafts and saves them with POST /transactions/bulk.
+    """
+    try:
+        import pytesseract
+        from PIL import Image
+
+        from backend.transaction_ocr import extract_text_from_image
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Screenshot import is not set up on the server "
+            "(install pytesseract and Pillow).",
+        )
+
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=415, detail="Upload a PNG, JPG or WEBP image")
+
+    data = file.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Image is too large (max 5 MB)")
+
+    try:
+        image = Image.open(io.BytesIO(data))
+        if image.width * image.height > MAX_IMAGE_PIXELS:
+            raise HTTPException(status_code=413, detail="Image dimensions are too large")
+        image.load()
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="That file is not a valid image")
+
+    try:
+        text = extract_text_from_image(image)
+    except pytesseract.TesseractNotFoundError:
+        raise HTTPException(
+            status_code=503,
+            detail="Tesseract OCR is not installed, or TESSERACT_CMD in .env is wrong.",
+        )
+    except RuntimeError:  # pytesseract raises this when OCR times out
+        raise HTTPException(
+            status_code=504,
+            detail="Reading the image took too long. Try a smaller or cropped screenshot.",
+        )
+    except Exception:
+        raise server_error("Unable to read the screenshot")
+
+    candidates = parse_transactions(text, default_type)
+
+    # Flag rows that look like transactions you already saved.
+    for candidate in candidates:
+        candidate["possible_duplicate"] = False
+    if candidates:
+        try:
+            dates = [candidate["date"] for candidate in candidates]
+            existing = fetch_all(
+                """
+                SELECT date, amount, type FROM transactions
+                WHERE user_id = %s AND date BETWEEN %s AND %s
+                """,
+                (user_id, min(dates), max(dates)),
+            )
+            seen = {
+                (row["date"].isoformat(), round(float(row["amount"]), 2), row["type"])
+                for row in existing
+            }
+            for candidate in candidates:
+                key = (candidate["date"], round(candidate["amount"], 2), candidate["type"])
+                candidate["possible_duplicate"] = key in seen
+        except Exception:
+            logger.exception("Duplicate check failed; continuing without it")
+
+    return {"text": text, "transactions": candidates}
+
+
+@app.post("/transactions/bulk")
+def create_transactions_bulk(
+    payload: BulkTransactions,
+    user_id: int = Depends(get_current_user),
+):
+    try:
+        rows = [
+            (
+                item.description,
+                item.category,
+                round(item.amount, 2),
+                item.date,
+                item.type,
+                user_id,
+            )
+            for item in payload.transactions
+        ]
+        execute_many(
+            """
+            INSERT INTO transactions
+            (description, category, amount, date, type, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            rows,
+        )
+        return {"message": f"{len(rows)} transactions added", "count": len(rows)}
+    except Exception:
+        raise server_error("Unable to add transactions")
 
 # -------------------- PROTECTED SAVINGS --------------------
 
@@ -459,6 +601,9 @@ def create_upcoming_expense(
     except Exception:
         raise server_error("Unable to add upcoming expense")
 
+@app.get("/import-screenshot")
+def import_screenshot_page():
+    return page("import-screenshot.html")
 
 @app.get("/upcoming-expenses")
 def get_upcoming_expenses(user_id: int = Depends(get_current_user)):
