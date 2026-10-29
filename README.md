@@ -98,6 +98,6 @@ To run it:
 pip install -r requirements.txt
 Put a new JWT_SECRET_KEY (32+ characters) in .env.
 From the project root, run uvicorn backend.main:app --reload.
-Open http://127.0.0.1:8000, register, and log in.
+Open <http://127.0.0.1:8000>, register, and log in.
 
 If something errors, paste the message here and I’ll fix it.
