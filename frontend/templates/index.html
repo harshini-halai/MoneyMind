@@ -1,8 +1,6 @@
 ﻿<!doctype html>
 <html lang="en">
   <head>
-    <script src="/frontend/js/auth.js"></script>
-
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -10,17 +8,21 @@
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
-  <body>
+  <body data-auth="required">
     <header class="header">
-    <script src="/frontend/js/auth.js"></script>
-
-      <div class="header-content">
-        <h1>MoneyMind</h1>
-        <p>Manage Money, Build Savings</p>
+      <div class="header-content header-row">
+        <div>
+          <h1>MoneyMind</h1>
+          <p>Manage Money, Build Savings</p>
+        </div>
+        <button type="button" id="logout-button" class="logout-button">Log out</button>
       </div>
     </header>
 
     <main class="dashboard">
+      <p id="flash-message" class="message" hidden></p>
+      <p id="dashboard-message" class="message" hidden></p>
+
       <!-- Financial Overview -->
       <section class="financial-overview">
         <div class="section-heading">
@@ -31,33 +33,33 @@
         <div class="summary-grid">
           <div class="summary-card">
             <h3>Available Balance</h3>
-            <p class="amount" id="balance">???????0</p>
+            <p class="amount" id="balance">₹0</p>
           </div>
 
           <div class="summary-card">
             <h3>Safe to Spend</h3>
-            <p class="amount" id="safe-to-spend">???????0</p>
-            <p id="upcoming-expenses-summary">Upcoming: ???????0</p>
+            <p class="amount" id="safe-to-spend">₹0</p>
+            <p class="card-note" id="upcoming-expenses-summary">Upcoming: ₹0</p>
           </div>
 
           <div class="summary-card">
             <h3>Total Income</h3>
-            <p class="amount" id="total-income">???????0</p>
+            <p class="amount" id="total-income">₹0</p>
           </div>
 
           <div class="summary-card">
             <h3>Total Expenses</h3>
-            <p class="amount" id="total-expenses">???????0</p>
+            <p class="amount" id="total-expenses">₹0</p>
           </div>
 
           <div class="summary-card">
             <h3>Protected Savings</h3>
-            <p class="amount" id="protected-savings">???????0</p>
+            <p class="amount" id="protected-savings">₹0</p>
           </div>
 
           <div class="summary-card">
             <h3>Emergency Fund</h3>
-            <p class="amount" id="emergency-fund">???????0</p>
+            <p class="amount" id="emergency-fund">₹0</p>
           </div>
         </div>
       </section>
@@ -73,10 +75,9 @@
           <a href="/add-income" class="primary-button">Add Income</a>
           <a href="/add-expense" class="secondary-button">Add Expense</a>
           <a href="/add-savings" class="primary-button">Add Savings</a>
-          <a href="/add-emergency-fund" class="primary-button">
-            Add Emergency Fund
-          </a>
-          <a href="/add-budget" class="primary-button"> Add Budget </a>
+          <a href="/add-emergency-fund" class="primary-button">Add Emergency Fund</a>
+          <a href="/add-upcoming-expense" class="primary-button">Add Upcoming Expense</a>
+          <a href="/add-budget" class="primary-button">Add Budget</a>
         </div>
       </section>
 
@@ -98,20 +99,19 @@
         </div>
 
         <div class="chart-container">
-          <canvas id="spending-chart"></canvas>
+          <canvas id="spending-chart" hidden></canvas>
+          <p id="chart-empty" class="empty-state">No expenses to show yet.</p>
         </div>
       </section>
 
-      <!-- Recent Transactions -->
+      <!-- Transactions -->
       <section class="transactions-section">
         <div class="section-heading">
           <h2>Transactions</h2>
           <p>View and manage your financial transactions</p>
         </div>
 
-        <a href="/transactions-page" class="primary-button">
-          View Transactions
-        </a>
+        <a href="/transactions-page" class="primary-button">View Transactions</a>
       </section>
 
       <!-- Savings Goals -->
@@ -122,7 +122,7 @@
         </div>
 
         <div class="goals-list">
-          <p class="empty-state">No savings goals added yet.</p>
+          <p class="empty-state">Savings goals are coming soon.</p>
         </div>
       </section>
 
@@ -138,7 +138,9 @@
             </p>
           </div>
 
-          <button class="khata-button">Ask Khata</button>
+          <button type="button" class="khata-button" disabled title="Coming soon">
+            Ask Khata (coming soon)
+          </button>
         </div>
       </section>
     </main>
@@ -147,7 +149,9 @@
       <p>MoneyMind</p>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Pinned version. For production, download this file and serve it from /frontend/js/ instead. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="/frontend/js/api.js"></script>
     <script src="/frontend/js/budget.js"></script>
     <script src="/frontend/js/script.js"></script>
   </body>
