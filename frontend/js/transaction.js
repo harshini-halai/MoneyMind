@@ -1,286 +1,255 @@
-let extractedTransactions = [];
+// Add income / add expense forms, and the transactions list (edit + delete).
 
-const allowedCategories = ["Food", "Travel", "Shopping", "Bills", "Other"];
+let transactionsById = {};
+
+// ---------- list ----------
+
+function buildTransactionItem(transaction) {
+  const item = document.createElement("div");
+  item.className = "transaction-item";
+
+  const main = document.createElement("div");
+  main.className = "transaction-main";
+  const title = document.createElement("strong");
+  title.textContent = transaction.description;
+  const meta = document.createElement("span");
+  meta.className = "transaction-meta";
+  meta.textContent = `${transaction.category} · ${transaction.date}`;
+  main.appendChild(title);
+  main.appendChild(meta);
+
+  const amount = document.createElement("div");
+  const isIncome = transaction.type === "income";
+  amount.className = `transaction-amount ${isIncome ? "income" : "expense"}`;
+  amount.textContent = `${isIncome ? "+" : "-"}${formatMoney(transaction.amount)}`;
+
+  const actions = document.createElement("div");
+  actions.className = "transaction-actions";
+
+  const editButton = document.createElement("button");
+  editButton.type = "button";
+  editButton.className = "update-button";
+  editButton.dataset.action = "edit";
+  editButton.dataset.id = transaction.id;
+  editButton.textContent = "Update";
+
+  const deleteButton = document.createElement("button");
+  deleteButton.type = "button";
+  deleteButton.className = "delete-button";
+  deleteButton.dataset.action = "delete";
+  deleteButton.dataset.id = transaction.id;
+  deleteButton.textContent = "Delete";
+
+  actions.appendChild(editButton);
+  actions.appendChild(deleteButton);
+
+  item.appendChild(main);
+  item.appendChild(amount);
+  item.appendChild(actions);
+  return item;
+}
 
 async function loadTransactions() {
-  const response = await authFetch("/transactions");
-  if (!response) return;
-
-  const transactions = await response.json();
-  const listContainer = document.getElementById("transaction-list");
-  if (!listContainer) return;
-
-  listContainer.innerHTML = "";
-
-  transactions.forEach((tx) => {
-    const row = document.createElement("tr");
-
-    const dateTd = document.createElement("td");
-    dateTd.textContent = tx.date;
-
-    const descTd = document.createElement("td");
-    descTd.textContent = tx.description || tx.title;
-
-    const catTd = document.createElement("td");
-    catTd.textContent = tx.category;
-
-    const typeTd = document.createElement("td");
-    typeTd.textContent = tx.type || tx.transaction_type;
-
-    const amountTd = document.createElement("td");
-    amountTd.textContent = `₹${tx.amount}`;
-
-    const actionTd = document.createElement("td");
-    const deleteBtn = document.createElement("button");
-    deleteBtn.textContent = "Delete";
-    deleteBtn.style.padding = "4px 8px";
-    deleteBtn.addEventListener("click", () => deleteTransaction(tx.id));
-    actionTd.appendChild(deleteBtn);
-
-    row.appendChild(dateTd);
-    row.appendChild(descTd);
-    row.appendChild(catTd);
-    row.appendChild(typeTd);
-    row.appendChild(amountTd);
-    row.appendChild(actionTd);
-
-    listContainer.appendChild(row);
-  });
-}
-
-async function deleteTransaction(transactionId) {
-  if (!confirm("Are you sure you want to delete this transaction?")) return;
-
-  const response = await authFetch(`/transactions/${transactionId}`, {
-    method: "DELETE",
-  });
-
-  if (response && response.ok) {
-    loadTransactions();
-  } else {
-    alert("Failed to delete transaction.");
-  }
-}
-
-async function uploadScreenshot() {
-  const fileInput = document.getElementById("screenshot-file-input");
-  const statusDiv = document.getElementById("import-status");
-  const previewSection = document.getElementById("preview-section");
-
-  if (!fileInput.files || fileInput.files.length === 0) {
-    statusDiv.textContent = "Please select an image first.";
-    statusDiv.style.color = "red";
+  const list = document.querySelector(".transactions-list");
+  if (!list) {
     return;
-  }
-
-  const file = fileInput.files[0];
-  const formData = new FormData();
-  formData.append("file", file);
-
-  statusDiv.textContent =
-    "Processing image with vision model/OCR... Please wait.";
-  statusDiv.style.color = "blue";
-  previewSection.style.display = "none";
-
-  const token = getAuthToken();
-  const headers = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
   }
 
   try {
-    const res = await fetch(`${API_BASE_URL}/transactions/import-screenshot`, {
-      method: "POST",
-      headers,
-      body: formData,
+    const result = await apiFetch("/transactions");
+    if (!result.ok) {
+      throw new Error(errorMessage(result.data, "Unable to load transactions"));
+    }
+
+    transactionsById = {};
+    list.innerHTML = "";
+
+    if (result.data.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "empty-state";
+      empty.textContent = "No transactions yet.";
+      list.appendChild(empty);
+      return;
+    }
+
+    result.data.forEach(function (transaction) {
+      transactionsById[transaction.id] = transaction;
+      list.appendChild(buildTransactionItem(transaction));
     });
-
-    if (!res.ok) {
-      statusDiv.textContent =
-        "Extraction failed. Check file format or server logs.";
-      statusDiv.style.color = "red";
-      return;
-    }
-
-    const data = await res.json();
-    extractedTransactions = data.transactions || [];
-
-    if (extractedTransactions.length === 0) {
-      statusDiv.textContent = "No transactions found in this screenshot.";
-      statusDiv.style.color = "orange";
-      return;
-    }
-
-    statusDiv.textContent = `Extracted ${extractedTransactions.length} transaction(s). Please review and correct below.`;
-    statusDiv.style.color = "green";
-    renderPreview();
-  } catch (err) {
-    statusDiv.textContent = "Network error during upload.";
-    statusDiv.style.color = "red";
+  } catch (error) {
+    console.error(error);
+    showMessage(
+      "transactions-message",
+      "Unable to load transactions.",
+      "error",
+    );
   }
 }
 
-function renderPreview() {
-  const previewSection = document.getElementById("preview-section");
-  const previewList = document.getElementById("preview-list");
-  previewList.innerHTML = "";
+// ---------- edit dialog ----------
 
-  extractedTransactions.forEach((item, index) => {
-    const row = document.createElement("tr");
-    if (item.needs_review) {
-      row.style.backgroundColor = "#fff3cd";
-    }
-
-    const dateTd = document.createElement("td");
-    const dateInput = document.createElement("input");
-    dateInput.type = "date";
-    dateInput.value = item.date || "";
-    dateInput.addEventListener("input", (e) => {
-      extractedTransactions[index].date = e.target.value;
-    });
-    dateTd.appendChild(dateInput);
-
-    const descTd = document.createElement("td");
-    const descInput = document.createElement("input");
-    descInput.type = "text";
-    descInput.value = item.description || "";
-    descInput.addEventListener("input", (e) => {
-      extractedTransactions[index].description = e.target.value;
-    });
-    descTd.appendChild(descInput);
-
-    const amountTd = document.createElement("td");
-    const amountInput = document.createElement("input");
-    amountInput.type = "number";
-    amountInput.step = "0.01";
-    amountInput.value = item.amount || 0;
-    amountInput.addEventListener("input", (e) => {
-      extractedTransactions[index].amount = parseFloat(e.target.value) || 0;
-    });
-    amountTd.appendChild(amountInput);
-
-    const typeTd = document.createElement("td");
-    const typeSelect = document.createElement("select");
-    ["expense", "income"].forEach((t) => {
-      const opt = document.createElement("option");
-      opt.value = t;
-      opt.textContent = t;
-      if (t === item.type) opt.selected = true;
-      typeSelect.appendChild(opt);
-    });
-    typeSelect.addEventListener("change", (e) => {
-      extractedTransactions[index].type = e.target.value;
-    });
-    typeTd.appendChild(typeSelect);
-
-    const catTd = document.createElement("td");
-    const catSelect = document.createElement("select");
-    allowedCategories.forEach((c) => {
-      const opt = document.createElement("option");
-      opt.value = c;
-      opt.textContent = c;
-      if (c === item.category) opt.selected = true;
-      catSelect.appendChild(opt);
-    });
-    catSelect.addEventListener("change", (e) => {
-      extractedTransactions[index].category = e.target.value;
-    });
-    catTd.appendChild(catSelect);
-
-    const statusTd = document.createElement("td");
-    statusTd.textContent = item.needs_review ? "Needs review" : "Ready";
-    statusTd.style.fontWeight = "bold";
-    statusTd.style.color = item.needs_review ? "#856404" : "green";
-
-    const actionTd = document.createElement("td");
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.textContent = "Remove";
-    removeBtn.addEventListener("click", () => {
-      extractedTransactions.splice(index, 1);
-      renderPreview();
-    });
-    actionTd.appendChild(removeBtn);
-
-    row.appendChild(dateTd);
-    row.appendChild(descTd);
-    row.appendChild(amountTd);
-    row.appendChild(typeTd);
-    row.appendChild(catTd);
-    row.appendChild(statusTd);
-    row.appendChild(actionTd);
-
-    previewList.appendChild(row);
-  });
-
-  previewSection.style.display = "block";
-}
-
-async function confirmImport() {
-  if (extractedTransactions.length === 0) {
-    alert("No items to save.");
+function openEditDialog(id) {
+  const transaction = transactionsById[id];
+  const dialog = document.getElementById("edit-dialog");
+  if (!transaction || !dialog) {
     return;
   }
 
-  for (let i = 0; i < extractedTransactions.length; i++) {
-    const item = extractedTransactions[i];
-    if (!item.date) {
-      alert(`Row ${i + 1}: Date missing hai, please date enter karein.`);
-      return;
+  document.getElementById("edit-id").value = transaction.id;
+  document.getElementById("edit-description").value = transaction.description;
+  document.getElementById("edit-amount").value = transaction.amount;
+  document.getElementById("edit-category").value = transaction.category;
+  document.getElementById("edit-date").value = String(transaction.date).slice(
+    0,
+    10,
+  );
+  document.getElementById("edit-type").value = transaction.type;
+  showMessage("edit-message", "");
+  dialog.showModal();
+}
+
+async function saveEdit(event) {
+  event.preventDefault();
+  const id = document.getElementById("edit-id").value;
+  const saveButton = document.getElementById("edit-save");
+  saveButton.disabled = true;
+
+  const data = {
+    description: document.getElementById("edit-description").value.trim(),
+    category: document.getElementById("edit-category").value,
+    amount: Number(document.getElementById("edit-amount").value),
+    date: document.getElementById("edit-date").value,
+    type: document.getElementById("edit-type").value,
+  };
+
+  try {
+    const result = await apiFetch(`/transactions/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+
+    if (result.ok) {
+      document.getElementById("edit-dialog").close();
+      showMessage("transactions-message", "Transaction updated", "success");
+      await loadTransactions();
+    } else {
+      showMessage(
+        "edit-message",
+        errorMessage(result.data, "Unable to update transaction"),
+        "error",
+      );
     }
-    if (item.amount <= 0) {
-      alert(`Row ${i + 1}: Amount 0 se zyada hona chahiye.`);
-      return;
-    }
+  } catch (error) {
+    showMessage("edit-message", "Unable to update transaction", "error");
   }
 
-  const payload = extractedTransactions.map((item) => ({
-    description: item.description,
-    amount: item.amount,
-    category: item.category,
-    type: item.type,
-    date: item.date,
-  }));
+  saveButton.disabled = false;
+}
 
-  const response = await authFetch("/transactions/confirm-import", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+// ---------- delete ----------
 
-  if (response && response.ok) {
-    alert("All transactions imported successfully!");
-    extractedTransactions = [];
-    document.getElementById("preview-section").style.display = "none";
-    document.getElementById("import-status").textContent = "";
-    document.getElementById("screenshot-file-input").value = "";
-    loadTransactions();
-  } else {
-    alert("Failed to confirm transactions. Please check input fields.");
+async function deleteTransaction(id) {
+  if (!confirm("Are you sure you want to delete this transaction?")) {
+    return;
+  }
+
+  try {
+    const result = await apiFetch(`/transactions/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+
+    if (result.ok) {
+      showMessage("transactions-message", "Transaction deleted", "success");
+      await loadTransactions();
+    } else {
+      showMessage(
+        "transactions-message",
+        errorMessage(result.data, "Unable to delete transaction"),
+        "error",
+      );
+    }
+  } catch (error) {
+    showMessage(
+      "transactions-message",
+      "Unable to delete transaction",
+      "error",
+    );
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  if (document.getElementById("transaction-list")) {
-    loadTransactions();
-  }
+// ---------- page setup ----------
 
-  const uploadBtn = document.getElementById("upload-screenshot-btn");
-  if (uploadBtn) {
-    uploadBtn.addEventListener("click", uploadScreenshot);
-  }
+document.addEventListener("DOMContentLoaded", function () {
+  setDefaultDate("income-date");
+  setDefaultDate("expense-date");
 
-  const confirmBtn = document.getElementById("confirm-import-btn");
-  if (confirmBtn) {
-    confirmBtn.addEventListener("click", confirmImport);
-  }
+  bindSimpleForm({
+    formId: "income-form",
+    endpoint: "/transactions",
+    messageId: "income-message",
+    successText: "Income added successfully",
+    failText: "Unable to add income",
+    buildPayload: function () {
+      return {
+        description: document.getElementById("income-description").value.trim(),
+        category: "Other",
+        amount: Number(document.getElementById("income-amount").value),
+        date: document.getElementById("income-date").value,
+        type: "income",
+      };
+    },
+  });
 
-  const cancelBtn = document.getElementById("cancel-import-btn");
-  if (cancelBtn) {
-    cancelBtn.addEventListener("click", () => {
-      extractedTransactions = [];
-      document.getElementById("preview-section").style.display = "none";
-      document.getElementById("import-status").textContent = "";
-      document.getElementById("screenshot-file-input").value = "";
+  bindSimpleForm({
+    formId: "expense-form",
+    endpoint: "/transactions",
+    messageId: "expense-message",
+    successText: "Expense added successfully",
+    failText: "Unable to add expense",
+    buildPayload: function () {
+      return {
+        description: document
+          .getElementById("expense-description")
+          .value.trim(),
+        category: document.getElementById("expense-category").value,
+        amount: Number(document.getElementById("expense-amount").value),
+        date: document.getElementById("expense-date").value,
+        type: "expense",
+      };
+    },
+  });
+
+  const list = document.querySelector(".transactions-list");
+  if (list) {
+    list.addEventListener("click", function (event) {
+      const button = event.target.closest("button[data-action]");
+      if (!button) {
+        return;
+      }
+      if (button.dataset.action === "edit") {
+        openEditDialog(button.dataset.id);
+      } else if (button.dataset.action === "delete") {
+        deleteTransaction(button.dataset.id);
+      }
     });
+
+    const refreshButton = document.getElementById("refresh-transactions");
+    if (refreshButton) {
+      refreshButton.addEventListener("click", loadTransactions);
+    }
+
+    const editForm = document.getElementById("edit-form");
+    if (editForm) {
+      editForm.addEventListener("submit", saveEdit);
+    }
+
+    const cancelEdit = document.getElementById("edit-cancel");
+    if (cancelEdit) {
+      cancelEdit.addEventListener("click", function () {
+        document.getElementById("edit-dialog").close();
+      });
+    }
+
+    loadTransactions();
   }
 });
