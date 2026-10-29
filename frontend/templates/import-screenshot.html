@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Import Screenshot - MoneyMind</title>
+
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body data-auth="required">
+    <header class="header">
+      <div class="header-content header-row">
+        <div>
+          <h1><a href="/">MoneyMind</a></h1>
+          <p>Import Screenshot</p>
+        </div>
+        <button type="button" id="logout-button" class="logout-button">
+          Log out
+        </button>
+      </div>
+    </header>
+
+    <main class="dashboard">
+      <section class="form-card wide">
+        <div class="section-heading">
+          <h2>Import from a screenshot</h2>
+          <p>
+            Upload a screenshot of your payment app. You will review everything
+            before anything is saved. The image is read in memory and is not
+            stored.
+          </p>
+        </div>
+
+        <form id="import-form">
+          <div class="form-field">
+            <label for="import-file"
+              >Screenshot (PNG, JPG or WEBP, up to 5 MB)</label
+            >
+            <input
+              type="file"
+              id="import-file"
+              accept="image/png,image/jpeg,image/webp"
+              required
+            />
+          </div>
+
+          <div class="form-field">
+            <label for="import-default-type"
+              >When it is not clear, treat payments as</label
+            >
+            <select id="import-default-type">
+              <option value="expense">Expenses (money I paid)</option>
+              <option value="income">Income (money I received)</option>
+            </select>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="import-scan" class="primary-button">
+              Scan screenshot
+            </button>
+            <a href="/" class="secondary-button">Cancel</a>
+          </div>
+        </form>
+
+        <p id="import-message" class="message" hidden></p>
+      </section>
+
+      <section id="import-results" class="form-card wide" hidden>
+        <div class="section-heading">
+          <h2>Check what was found</h2>
+          <p>
+            Edit anything that is wrong, untick rows you do not want, then save.
+          </p>
+        </div>
+
+        <p class="message warning">
+          Reading text from images is not perfect. Compare every amount with
+          your screenshot before saving.
+        </p>
+
+        <div class="import-layout">
+          <img
+            id="import-preview"
+            class="import-preview"
+            alt="Your uploaded screenshot"
+          />
+
+          <div>
+            <label class="checkbox-row" id="import-drop-digit-row" hidden>
+              <input type="checkbox" id="import-drop-digit" />
+              <span>
+                Amounts look too big? Tick this to remove the first digit (the
+                scanner often reads the ₹ sign as a digit, so ₹485 shows as
+                2485).
+              </span>
+            </label>
+
+            <div id="import-rows" class="import-rows"></div>
+
+            <div class="form-actions">
+              <button type="button" id="import-save" class="primary-button">
+                Save ticked transactions
+              </button>
+            </div>
+            <p id="import-save-message" class="message" hidden></p>
+          </div>
+        </div>
+
+        <details class="import-raw-details">
+          <summary>Show the text that was read from the image</summary>
+          <pre id="import-raw"></pre>
+        </details>
+      </section>
+    </main>
+
+    <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/import.js"></script>
+  </body>
+</html>
