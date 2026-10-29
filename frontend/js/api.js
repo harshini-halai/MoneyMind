@@ -39,10 +39,11 @@ async function apiFetch(path, options = {}) {
   const { public: isPublic = false, ...fetchOptions } = options;
   const headers = { ...(fetchOptions.headers || {}) };
 
-  if (fetchOptions.body && !headers["Content-Type"]) {
+  const isFormData =
+    typeof FormData !== "undefined" && fetchOptions.body instanceof FormData;
+  if (fetchOptions.body && !isFormData && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
-
   if (!isPublic) {
     const token = getToken();
     if (!token) {
