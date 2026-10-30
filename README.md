@@ -49,8 +49,8 @@ Interactive API docs are at <http://127.0.0.1:8000/docs>.
 
 ### Khata — AI & ML Intelligence
 
-- [ ] Smart Expense Categorization
-- [ ] User Feedback & Learning
+- [x] Smart Expense Categorization
+- [x] User Feedback & Learning
 - [ ] Merchant Recognition
 - [ ] Confidence-Based Categorization
 - [ ] Smart Spending Insights
