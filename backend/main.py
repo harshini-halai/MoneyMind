@@ -1,4 +1,5 @@
 ﻿import datetime as dt
+import io
 import logging
 import os
 import re
@@ -6,17 +7,27 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Annotated, Literal
-import datetime as dt
-import io
-import logging
+
 import mysql.connector
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StringConstraints, field_validator
-from backend.transaction_parser import parse_transactions
+
+from backend.categorizer import merchant_keys
+from backend.categorizer import suggest as suggest_category
 from backend.database import get_connection
+from backend.transaction_parser import parse_transactions
 from backend.security import (
     create_access_token,
     fake_verify_password,
@@ -104,6 +115,7 @@ def execute_write(query, params=()):
         if connection and connection.is_connected():
             connection.close()
 
+
 def execute_many(query, rows):
     """Run one INSERT for many rows inside a single transaction."""
     connection = None
@@ -125,10 +137,60 @@ def execute_many(query, rows):
         if connection and connection.is_connected():
             connection.close()
 
+
 def server_error(message: str) -> HTTPException:
     """Log the real exception (call inside `except`) and return a safe 500."""
     logger.exception(message)
     return HTTPException(status_code=500, detail=message)
+
+
+# -------------------- CATEGORY LEARNING --------------------
+
+LEARN_SQL = """
+    INSERT INTO category_memory (user_id, merchant_key, category, times_confirmed)
+    VALUES (%s, %s, %s, 1)
+    ON DUPLICATE KEY UPDATE
+        times_confirmed = IF(category = VALUES(category), times_confirmed + 1, 1),
+        category = VALUES(category)
+"""
+
+
+def load_memory(user_id: int, keys=None) -> dict:
+    """What this user has taught us: {merchant_key: (category, times_confirmed)}.
+
+    Pass `keys` to load only those keys, or leave it out to load everything.
+    """
+    if keys is not None:
+        if not keys:
+            return {}
+        placeholders = ", ".join(["%s"] * len(keys))
+        rows = fetch_all(
+            "SELECT merchant_key, category, times_confirmed FROM category_memory "
+            f"WHERE user_id = %s AND merchant_key IN ({placeholders})",
+            (user_id, *keys),
+        )
+    else:
+        rows = fetch_all(
+            "SELECT merchant_key, category, times_confirmed FROM category_memory "
+            "WHERE user_id = %s",
+            (user_id,),
+        )
+    return {
+        row["merchant_key"]: (row["category"], row["times_confirmed"])
+        for row in rows
+    }
+
+
+def learn_category(user_id: int, description: str, category: str) -> None:
+    """Remember that this user files this kind of expense under `category`.
+
+    Best effort: a problem here must never stop the transaction from saving.
+    """
+    try:
+        for key in merchant_keys(description):
+            execute_write(LEARN_SQL, (user_id, key, category))
+    except Exception:
+        logger.exception("Could not save category learning; continuing")
 
 
 # -------------------- MODELS --------------------
@@ -148,6 +210,10 @@ class Transaction(BaseModel):
     amount: Money
     date: dt.date
     type: Literal["income", "expense"]
+
+
+class BulkTransactions(BaseModel):
+    transactions: list[Transaction] = Field(min_length=1, max_length=100)
 
 
 class Saving(BaseModel):
@@ -194,8 +260,6 @@ class UserLogin(BaseModel):
     email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)]
     password: Annotated[str, Field(min_length=1, max_length=128)]
 
-class BulkTransactions(BaseModel):
-    transactions: list[Transaction] = Field(min_length=1, max_length=100)
 
 # -------------------- LOGIN RATE LIMIT (in-memory, single process) --------------------
 
@@ -281,6 +345,11 @@ def add_budget_page():
     return page("add-budget.html")
 
 
+@app.get("/import-screenshot")
+def import_screenshot_page():
+    return page("import-screenshot.html")
+
+
 @app.get("/add-upcoming-expense")
 def add_upcoming_expense_page():
     return page("add-upcoming-expense.html")
@@ -309,6 +378,8 @@ def create_transaction(
                 user_id,
             ),
         )
+        if transaction.type == "expense":
+            learn_category(user_id, transaction.description, transaction.category)
         return {"message": "Transaction added successfully"}
     except Exception:
         raise server_error("Unable to add transaction")
@@ -365,6 +436,8 @@ def update_transaction(
             if not exists:
                 raise HTTPException(status_code=404, detail="Transaction not found")
 
+        if transaction.type == "expense":
+            learn_category(user_id, transaction.description, transaction.category)
         return {"message": "Transaction updated successfully"}
     except HTTPException:
         raise
@@ -389,6 +462,7 @@ def delete_transaction(
         raise
     except Exception:
         raise server_error("Unable to delete transaction")
+
 
 # -------------------- SCREENSHOT IMPORT --------------------
 
@@ -454,6 +528,19 @@ def import_screenshot(
 
     candidates = parse_transactions(text, default_type)
 
+    # Prefer categories this user has chosen before over the built-in guesses.
+    for candidate in candidates:
+        candidate["category_source"] = "default"
+    try:
+        memory = load_memory(user_id)
+        for candidate in candidates:
+            if candidate["type"] == "expense":
+                suggestion = suggest_category(candidate["description"], memory)
+                candidate["category"] = suggestion["category"]
+                candidate["category_source"] = suggestion["source"]
+    except Exception:
+        logger.exception("Category suggestions failed; using built-in guesses")
+
     # Flag rows that look like transactions you already saved.
     for candidate in candidates:
         candidate["possible_duplicate"] = False
@@ -505,9 +592,13 @@ def create_transactions_bulk(
             """,
             rows,
         )
+        for item in payload.transactions:
+            if item.type == "expense":
+                learn_category(user_id, item.description, item.category)
         return {"message": f"{len(rows)} transactions added", "count": len(rows)}
     except Exception:
         raise server_error("Unable to add transactions")
+
 
 # -------------------- PROTECTED SAVINGS --------------------
 
@@ -601,9 +692,6 @@ def create_upcoming_expense(
     except Exception:
         raise server_error("Unable to add upcoming expense")
 
-@app.get("/import-screenshot")
-def import_screenshot_page():
-    return page("import-screenshot.html")
 
 @app.get("/upcoming-expenses")
 def get_upcoming_expenses(user_id: int = Depends(get_current_user)):
@@ -838,6 +926,19 @@ def get_categories(user_id: int = Depends(get_current_user)):
         return categories
     except Exception:
         raise server_error("Unable to fetch category totals")
+
+
+@app.get("/categories/suggest")
+def suggest_expense_category(
+    description: str = Query(..., min_length=1, max_length=255),
+    user_id: int = Depends(get_current_user),
+):
+    """Suggest a category for an expense description, using what you taught us."""
+    try:
+        memory = load_memory(user_id, merchant_keys(description))
+        return suggest_category(description, memory)
+    except Exception:
+        raise server_error("Unable to suggest a category")
 
 
 # -------------------- KHATA SUMMARY --------------------
