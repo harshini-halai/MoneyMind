@@ -603,3 +603,13 @@ footer {
     grid-column: 2 / -1;
   }
 }
+
+
+/* ---------- Category suggestion hint ---------- */
+
+.hint {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 4px;
+  min-height: 1em;
+}
