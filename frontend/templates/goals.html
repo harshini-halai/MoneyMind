@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dream Goals - MoneyMind</title>
+    <script src="/frontend/js/theme.js"></script>
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body data-auth="required" data-page="goals" data-title="Dream Goals">
+    <main class="content">
+      <div class="page-head">
+        <h1>Dream Goals</h1>
+        <p>Track what you are saving for</p>
+      </div>
+      <p id="flash-message" class="message" hidden></p>
+      <p id="goals-message" class="message" hidden></p>
+      <div class="form-actions" style="margin: 0 0 20px">
+        <a href="/add-goal" class="primary-button">+ New Goal</a>
+      </div>
+      <div id="goals-list" class="goal-cards">
+        <p class="empty-state">Loading goals...</p>
+      </div>
+    </main>
+
+    <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/layout.js"></script>
+    <script src="/frontend/js/goals.js"></script>
+  </body>
+</html>
