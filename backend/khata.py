@@ -72,6 +72,8 @@ def inr(value) -> str:
         whole = ",".join(groups + [tail])
     return f"{sign}₹{whole}.{fraction}"
 
+def _days(count: int) -> str:
+    return f"{count} day" if count == 1 else f"{count} days"
 
 def _days_left_in_month(today: date) -> int:
     return calendar.monthrange(today.year, today.month)[1] - today.day + 1
@@ -127,7 +129,7 @@ def _answer_safe_to_spend(snapshot, today):
         f"{inr(f['upcoming_expenses'])} of bills due in the next 30 days."
     )
     if safe > 0:
-        text += f" Spread over the {days} days left this month, that is about {inr(safe / days)} a day."
+            text += f" Spread over the {_days(days)} left this month, that is about {inr(safe / days)} a day."
     return text
 
 
@@ -367,7 +369,7 @@ def build_insights(snapshot: dict, today: date) -> list:
     if safe < 0:
         insights.append({
             "level": "warn",
-            "text": f"Your Safe to Spend is {inr(safe)}: upcoming bills are more than your free balance.",
+            "text": f"Your Safe to Spend is {inr(safe)}, about {inr(safe / days)} a day for the {_days(days)} left this month.",
         })
     elif safe > 0:
         days = _days_left_in_month(today)
