@@ -3,41 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <title>Transactions - MoneyMind</title>
-
+    <script src="/frontend/js/theme.js"></script>
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
-  <body data-auth="required">
-    <header class="header">
-      <div class="header-content header-row">
-        <div>
-          <h1><a href="/">MoneyMind</a></h1>
-          <p>All Transactions</p>
-        </div>
-        <button type="button" id="logout-button" class="logout-button">Log out</button>
+  <body data-auth="required" data-page="transactions" data-title="Transactions">
+    <main class="content">
+      <div class="page-head">
+        <h1>Transactions</h1>
+        <p>View and manage your income and expenses</p>
       </div>
-    </header>
-
-    <main class="dashboard">
-      <section class="transactions-section">
-        <div class="section-heading">
-          <h2>All Transactions</h2>
-          <p>View and manage your income and expenses</p>
-        </div>
-
+      <p id="flash-message" class="message" hidden></p>
+      <section class="card">
         <p id="transactions-message" class="message" hidden></p>
 
         <div class="transactions-list">
           <p class="empty-state">Loading transactions...</p>
         </div>
 
-        <div class="form-actions">
-          <button id="refresh-transactions" type="button" class="primary-button">
-            Refresh Transactions
+        <div class="form-actions" style="margin-top: 18px">
+          <button id="refresh-transactions" type="button" class="secondary-button">
+            Refresh
           </button>
-          <a href="/" class="secondary-button">Back to Dashboard</a>
+          <a href="/add-expense" class="primary-button">+ Add Expense</a>
         </div>
       </section>
     </main>
@@ -90,11 +79,8 @@
       </form>
     </dialog>
 
-    <footer>
-      <p>MoneyMind</p>
-    </footer>
-
     <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/layout.js"></script>
     <script src="/frontend/js/transaction.js"></script>
   </body>
 </html>

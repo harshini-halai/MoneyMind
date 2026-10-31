@@ -182,7 +182,7 @@ function showFlash() {
 // ---------- shared form wiring ----------
 
 // Most forms do the same thing: build a JSON payload, POST it, go to the
-// dashboard on success, show an error message on failure.
+// dashboard (or config.redirectTo) on success, show an error message on failure.
 function bindSimpleForm(config) {
   const form = document.getElementById(config.formId);
   if (!form) {
@@ -207,7 +207,11 @@ function bindSimpleForm(config) {
       });
 
       if (result.ok) {
-        flashAndGo(config.successText, "/");
+        const target =
+          typeof config.redirectTo === "function"
+            ? config.redirectTo()
+            : config.redirectTo || "/";
+        flashAndGo(config.successText, target);
         return;
       }
 

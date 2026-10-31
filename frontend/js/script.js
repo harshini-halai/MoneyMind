@@ -1,6 +1,17 @@
-// Dashboard (index.html): one request fills the whole overview.
+// Dashboard (index.html): summary numbers, Khata insights and the spending chart.
+
+const CHART_COLORS = [
+  "#2563eb",
+  "#14b8a6",
+  "#f59e0b",
+  "#ec4899",
+  "#8b5cf6",
+  "#64748b",
+];
+let lastCategories = null;
 
 function renderSpendingChart(categories) {
+  lastCategories = categories;
   const canvas = document.getElementById("spending-chart");
   const emptyState = document.getElementById("chart-empty");
   if (!canvas) {
@@ -33,6 +44,13 @@ function renderSpendingChart(categories) {
     existing.destroy();
   }
 
+  const textColor = getComputedStyle(document.documentElement)
+    .getPropertyValue("--muted")
+    .trim();
+  const surface = getComputedStyle(document.documentElement)
+    .getPropertyValue("--surface")
+    .trim();
+
   new Chart(canvas, {
     type: "doughnut",
     data: {
@@ -44,12 +62,17 @@ function renderSpendingChart(categories) {
           data: categories.map(function (item) {
             return item.total;
           }),
+          backgroundColor: CHART_COLORS,
+          borderColor: surface,
+          borderWidth: 2,
         },
       ],
     },
     options: {
       responsive: true,
+      cutout: "62%",
       plugins: {
+        legend: { position: "bottom", labels: { color: textColor } },
         tooltip: {
           callbacks: {
             label: function (context) {
@@ -64,6 +87,53 @@ function renderSpendingChart(categories) {
       },
     },
   });
+}
+
+function renderInsights(insights) {
+  const list = document.getElementById("insights-list");
+  if (!list) {
+    return;
+  }
+  list.innerHTML = "";
+
+  if (!insights || insights.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "empty-state";
+    empty.textContent = "No insights yet. Add a few transactions first.";
+    list.appendChild(empty);
+    return;
+  }
+
+  insights.forEach(function (insight) {
+    const item = document.createElement("li");
+    const level = ["warn", "good", "info"].includes(insight.level)
+      ? insight.level
+      : "info";
+    item.className = `insight ${level}`;
+    item.textContent = insight.text;
+    list.appendChild(item);
+  });
+}
+
+async function loadInsights() {
+  if (!document.getElementById("insights-list")) {
+    return;
+  }
+  try {
+    const result = await apiFetch("/khata/insights");
+    if (!result.ok) {
+      throw new Error("insights failed");
+    }
+    renderInsights(result.data.insights);
+  } catch (error) {
+    console.error(error);
+    const list = document.getElementById("insights-list");
+    list.innerHTML = "";
+    const failed = document.createElement("li");
+    failed.className = "empty-state";
+    failed.textContent = "Khata insights are not available right now.";
+    list.appendChild(failed);
+  }
 }
 
 async function loadDashboard() {
@@ -107,4 +177,18 @@ async function loadDashboard() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", loadDashboard);
+document.addEventListener("DOMContentLoaded", function () {
+  // The Khata page also loads this file (for renderInsights) but is not the dashboard.
+  if (document.body.dataset.page !== "dashboard") {
+    return;
+  }
+  loadDashboard();
+  loadInsights();
+});
+
+// Redraw the chart in the new colours when the theme changes.
+document.addEventListener("themechange", function () {
+  if (lastCategories) {
+    renderSpendingChart(lastCategories);
+  }
+});

@@ -3,45 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <title>MoneyMind</title>
+    <title>Dashboard - MoneyMind</title>
+    <script src="/frontend/js/theme.js"></script>
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
-  <body data-auth="required">
-    <header class="header">
-      <div class="header-content header-row">
-        <div>
-          <h1>MoneyMind</h1>
-          <p>Manage Money, Build Savings</p>
-        </div>
-        <button type="button" id="logout-button" class="logout-button">
-          Log out
-        </button>
+  <body data-auth="required" data-page="dashboard" data-title="Dashboard">
+    <main class="content">
+      <div class="page-head">
+        <h1>Dashboard</h1>
+        <p>Your money at a glance</p>
       </div>
-    </header>
-
-    <main class="dashboard">
       <p id="flash-message" class="message" hidden></p>
       <p id="dashboard-message" class="message" hidden></p>
 
-      <!-- Financial Overview -->
-      <section class="financial-overview">
+      <section class="card">
         <div class="section-heading">
-          <h2>Financial Overview</h2>
-          <p>Your money at a glance</p>
+          <h2>Khata insights</h2>
+          <p>Short notes based on your own numbers</p>
         </div>
+        <ul id="insights-list" class="insights">
+          <li class="empty-state">Loading insights...</li>
+        </ul>
+        <a href="/khata" class="card-link">Ask Khata a question &rarr;</a>
+      </section>
 
+      <section>
         <div class="summary-grid">
-          <div class="summary-card">
-            <h3>Available Balance</h3>
-            <p class="amount" id="balance">₹0</p>
-          </div>
-
-          <div class="summary-card">
+          <div class="summary-card highlight">
             <h3>Safe to Spend</h3>
             <p class="amount" id="safe-to-spend">₹0</p>
             <p class="card-note" id="upcoming-expenses-summary">Upcoming: ₹0</p>
+          </div>
+
+          <div class="summary-card">
+            <h3>Available Balance</h3>
+            <p class="amount" id="balance">₹0</p>
           </div>
 
           <div class="summary-card">
@@ -66,109 +63,63 @@
         </div>
       </section>
 
-      <!-- Quick Actions -->
-      <section class="quick-actions">
-        <div class="section-heading">
-          <h2>Quick Actions</h2>
-          <p>Manage your money</p>
-        </div>
+      <div class="grid-2">
+        <section class="card">
+          <div class="section-heading">
+            <h2>Spending Analysis</h2>
+            <p>Where your money is going</p>
+          </div>
+          <div class="chart-container">
+            <canvas id="spending-chart" hidden></canvas>
+            <p id="chart-empty" class="empty-state">No expenses to show yet.</p>
+          </div>
+        </section>
 
-        <div class="action-buttons">
-          <a href="/add-income" class="primary-button">Add Income</a>
-          <a href="/add-expense" class="secondary-button">Add Expense</a>
-          <a href="/add-savings" class="primary-button">Add Savings</a>
-          <a href="/add-emergency-fund" class="primary-button"
-            >Add Emergency Fund</a
-          >
-          <a href="/add-upcoming-expense" class="primary-button"
-            >Add Upcoming Expense</a
-          >
-          <a href="/add-budget" class="primary-button">Add Budget</a>
-          <a href="/import-screenshot" class="primary-button"
-            >Import Screenshot</a
-          >
-        </div>
-      </section>
+        <section class="card">
+          <div class="section-heading">
+            <h2>Dream Goals</h2>
+            <p>What you are saving for</p>
+          </div>
+          <div id="goals-preview" class="goals-list">
+            <p class="empty-state">Loading goals...</p>
+          </div>
+          <a href="/goals-page" class="card-link">See all goals &rarr;</a>
+        </section>
+      </div>
 
-      <section class="budgets-section">
+      <section class="card">
         <div class="section-heading">
           <h2>Budget Overview</h2>
-          <p>See how your spending compares with your monthly budgets</p>
+          <p>How your spending compares with your monthly budgets</p>
         </div>
-
         <div id="budget-list" class="budgets-list">
           <p class="empty-state">Loading budgets...</p>
         </div>
       </section>
 
-      <section class="spending-analysis-section">
+      <section class="card">
         <div class="section-heading">
-          <h2>Spending Analysis</h2>
-          <p>See where your money is going</p>
+          <h2>Quick Actions</h2>
+          <p>Add something new</p>
         </div>
-
-        <div class="chart-container">
-          <canvas id="spending-chart" hidden></canvas>
-          <p id="chart-empty" class="empty-state">No expenses to show yet.</p>
-        </div>
-      </section>
-
-      <!-- Transactions -->
-      <section class="transactions-section">
-        <div class="section-heading">
-          <h2>Transactions</h2>
-          <p>View and manage your financial transactions</p>
-        </div>
-
-        <a href="/transactions-page" class="primary-button"
-          >View Transactions</a
-        >
-      </section>
-
-      <!-- Savings Goals -->
-      <section class="goals-section">
-        <div class="section-heading">
-          <h2>Savings Goals</h2>
-          <p>Track what you're saving for</p>
-        </div>
-
-        <div class="goals-list">
-          <p class="empty-state">Savings goals are coming soon.</p>
-        </div>
-      </section>
-
-      <!-- Khata -->
-      <section class="khata-section">
-        <div class="khata-content">
-          <div>
-            <h2>Khata</h2>
-
-            <p>
-              Your financial intelligence assistant will help you understand and
-              improve your money decisions.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            class="khata-button"
-            disabled
-            title="Coming soon"
-          >
-            Ask Khata (coming soon)
-          </button>
+        <div class="action-buttons">
+          <a href="/add-income"><span>＋</span>Add Income</a>
+          <a href="/add-expense"><span>－</span>Add Expense</a>
+          <a href="/add-savings"><span>◈</span>Add Savings</a>
+          <a href="/add-goal"><span>◎</span>New Goal</a>
+          <a href="/add-emergency-fund"><span>✚</span>Emergency Fund</a>
+          <a href="/add-upcoming-expense"><span>◷</span>Upcoming Expense</a>
+          <a href="/add-budget"><span>▤</span>Add Budget</a>
+          <a href="/import-screenshot"><span>▣</span>Import Screenshot</a>
         </div>
       </section>
     </main>
 
-    <footer>
-      <p>MoneyMind</p>
-    </footer>
-
-    <!-- Pinned version. For production, download this file and serve it from /frontend/js/ instead. -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
     <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/layout.js"></script>
+    <script src="/frontend/js/chart.umd.js"></script>
     <script src="/frontend/js/budget.js"></script>
+    <script src="/frontend/js/goals.js"></script>
     <script src="/frontend/js/script.js"></script>
   </body>
 </html>

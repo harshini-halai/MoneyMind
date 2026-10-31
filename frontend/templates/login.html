@@ -3,21 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <title>Log in - MoneyMind</title>
-
+    <script src="/frontend/js/theme.js"></script>
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
   <body data-auth="guest" class="auth-page">
-    <header class="header">
-      <div class="header-content">
+    <div class="auth-wrap">
+      <div class="auth-brand">
+        <div class="brand-mark" aria-hidden="true">₹</div>
         <h1>MoneyMind</h1>
         <p>Manage Money, Build Savings</p>
       </div>
-    </header>
 
-    <main class="dashboard">
       <section class="form-card auth-card">
         <div class="section-heading">
           <h2>Log in</h2>
@@ -29,12 +27,10 @@
             <label for="login-email">Email</label>
             <input type="email" id="login-email" autocomplete="email" maxlength="255" required />
           </div>
-
           <div class="form-field">
             <label for="login-password">Password</label>
             <input type="password" id="login-password" autocomplete="current-password" maxlength="128" required />
           </div>
-
           <div class="form-actions">
             <button type="submit" class="primary-button">Log in</button>
           </div>
@@ -43,7 +39,7 @@
         <p id="auth-message" class="message" hidden></p>
         <p class="auth-alt">New here? <a href="/register">Create an account</a></p>
       </section>
-    </main>
+    </div>
 
     <script src="/frontend/js/api.js"></script>
     <script src="/frontend/js/auth.js"></script>

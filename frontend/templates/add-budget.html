@@ -3,30 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <title>Add Budget - MoneyMind</title>
-
+    <script src="/frontend/js/theme.js"></script>
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
-  <body data-auth="required">
-    <header class="header">
-      <div class="header-content header-row">
-        <div>
-          <h1><a href="/">MoneyMind</a></h1>
-          <p>Add Monthly Budget</p>
-        </div>
-        <button type="button" id="logout-button" class="logout-button">Log out</button>
+  <body data-auth="required" data-page="add-budget" data-title="Add Budget">
+    <main class="content">
+      <div class="page-head">
+        <h1>Add Budget</h1>
+        <p>Set a monthly spending limit for a category</p>
       </div>
-    </header>
-
-    <main class="dashboard">
+      <p id="flash-message" class="message" hidden></p>
       <section class="form-card">
-        <div class="section-heading">
-          <h2>Add Budget</h2>
-          <p>Set a spending limit for a category</p>
-        </div>
-
         <form id="budget-form">
           <div class="form-field">
             <label for="budget-category">Category</label>
@@ -39,17 +28,14 @@
               <option value="Other">Other</option>
             </select>
           </div>
-
           <div class="form-field">
             <label for="budget-amount">Budget amount (₹)</label>
             <input type="number" id="budget-amount" placeholder="0.00" min="0.01" step="0.01" required />
           </div>
-
           <div class="form-field">
             <label for="budget-month">Month</label>
             <input type="month" id="budget-month" required />
           </div>
-
           <div class="form-actions">
             <button type="submit" class="primary-button">Save Budget</button>
             <a href="/" class="secondary-button">Cancel</a>
@@ -61,6 +47,7 @@
     </main>
 
     <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/layout.js"></script>
     <script src="/frontend/js/budget.js"></script>
   </body>
 </html>

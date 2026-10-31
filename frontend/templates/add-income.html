@@ -3,46 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <title>Add Income - MoneyMind</title>
-
+    <script src="/frontend/js/theme.js"></script>
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
-  <body data-auth="required">
-    <header class="header">
-      <div class="header-content header-row">
-        <div>
-          <h1><a href="/">MoneyMind</a></h1>
-          <p>Add Income</p>
-        </div>
-        <button type="button" id="logout-button" class="logout-button">Log out</button>
+  <body data-auth="required" data-page="add-income" data-title="Add Income">
+    <main class="content">
+      <div class="page-head">
+        <h1>Add Income</h1>
+        <p>Record money you received</p>
       </div>
-    </header>
-
-    <main class="dashboard">
+      <p id="flash-message" class="message" hidden></p>
       <section class="form-card">
-        <div class="section-heading">
-          <h2>Add Income</h2>
-          <p>Record money you received</p>
-        </div>
-
         <form id="income-form">
           <div class="form-field">
             <label for="income-description">Description</label>
             <input type="text" id="income-description" placeholder="e.g. Salary" maxlength="255" required />
           </div>
-
           <div class="form-field">
             <label for="income-amount">Amount (₹)</label>
             <input type="number" id="income-amount" placeholder="0.00" min="0.01" step="0.01" required />
           </div>
-
           <div class="form-field">
             <label for="income-date">Date</label>
             <input type="date" id="income-date" required />
           </div>
-
           <div class="form-actions">
             <button type="submit" class="primary-button">Save Income</button>
             <a href="/" class="secondary-button">Cancel</a>
@@ -54,6 +40,7 @@
     </main>
 
     <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/layout.js"></script>
     <script src="/frontend/js/transaction.js"></script>
   </body>
 </html>

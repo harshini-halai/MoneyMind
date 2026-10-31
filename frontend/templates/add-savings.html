@@ -3,46 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
     <title>Add Savings - MoneyMind</title>
-
+    <script src="/frontend/js/theme.js"></script>
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
-  <body data-auth="required">
-    <header class="header">
-      <div class="header-content header-row">
-        <div>
-          <h1><a href="/">MoneyMind</a></h1>
-          <p>Add Savings</p>
-        </div>
-        <button type="button" id="logout-button" class="logout-button">Log out</button>
+  <body data-auth="required" data-page="add-savings" data-title="Add Savings">
+    <main class="content">
+      <div class="page-head">
+        <h1>Add Savings</h1>
+        <p>Protect money for your future. Optionally put it towards a goal.</p>
       </div>
-    </header>
-
-    <main class="dashboard">
+      <p id="flash-message" class="message" hidden></p>
       <section class="form-card">
-        <div class="section-heading">
-          <h2>Add Savings</h2>
-          <p>Protect money for your future goals</p>
-        </div>
-
         <form id="savings-form">
           <div class="form-field">
             <label for="savings-amount">Amount (₹)</label>
             <input type="number" id="savings-amount" placeholder="0.00" min="0.01" step="0.01" required />
           </div>
-
           <div class="form-field">
             <label for="savings-description">Description</label>
             <input type="text" id="savings-description" placeholder="e.g. Monthly savings" maxlength="255" required />
           </div>
-
+          <div class="form-field">
+            <label for="savings-goal">Put towards a goal (optional)</label>
+            <select id="savings-goal">
+              <option value="">No goal, just protect it</option>
+            </select>
+          </div>
           <div class="form-field">
             <label for="savings-date">Date</label>
             <input type="date" id="savings-date" required />
           </div>
-
           <div class="form-actions">
             <button type="submit" class="primary-button">Save Money</button>
             <a href="/" class="secondary-button">Cancel</a>
@@ -54,6 +46,7 @@
     </main>
 
     <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/layout.js"></script>
     <script src="/frontend/js/savings.js"></script>
   </body>
 </html>

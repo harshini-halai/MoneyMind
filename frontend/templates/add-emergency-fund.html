@@ -3,46 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <title>Emergency Fund - MoneyMind</title>
-
+    <title>Add Emergency Fund - MoneyMind</title>
+    <script src="/frontend/js/theme.js"></script>
     <link rel="stylesheet" href="/frontend/style.css" />
   </head>
 
-  <body data-auth="required">
-    <header class="header">
-      <div class="header-content header-row">
-        <div>
-          <h1><a href="/">MoneyMind</a></h1>
-          <p>Emergency Fund</p>
-        </div>
-        <button type="button" id="logout-button" class="logout-button">Log out</button>
+  <body data-auth="required" data-page="add-emergency-fund" data-title="Add Emergency Fund">
+    <main class="content">
+      <div class="page-head">
+        <h1>Add Emergency Fund</h1>
+        <p>Build a safety net for the unexpected</p>
       </div>
-    </header>
-
-    <main class="dashboard">
+      <p id="flash-message" class="message" hidden></p>
       <section class="form-card">
-        <div class="section-heading">
-          <h2>Add Emergency Fund</h2>
-          <p>Keep money protected for unexpected expenses</p>
-        </div>
-
         <form id="emergency-fund-form">
           <div class="form-field">
             <label for="emergency-fund-amount">Amount (₹)</label>
             <input type="number" id="emergency-fund-amount" placeholder="0.00" min="0.01" step="0.01" required />
           </div>
-
           <div class="form-field">
             <label for="emergency-fund-description">Description</label>
             <input type="text" id="emergency-fund-description" placeholder="e.g. Medical reserve" maxlength="255" required />
           </div>
-
           <div class="form-field">
             <label for="emergency-fund-date">Date</label>
             <input type="date" id="emergency-fund-date" required />
           </div>
-
           <div class="form-actions">
             <button type="submit" class="primary-button">Save Emergency Fund</button>
             <a href="/" class="secondary-button">Cancel</a>
@@ -54,6 +40,7 @@
     </main>
 
     <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/layout.js"></script>
     <script src="/frontend/js/emergency-fund.js"></script>
   </body>
 </html>
