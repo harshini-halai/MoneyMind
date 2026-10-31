@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ask Khata - MoneyMind</title>
+    <script src="/frontend/js/theme.js"></script>
+    <link rel="stylesheet" href="/frontend/style.css" />
+  </head>
+
+  <body data-auth="required" data-page="khata" data-title="Ask Khata">
+    <main class="content">
+      <div class="page-head">
+        <h1>Ask Khata</h1>
+        <p>Your money assistant. It answers from your own numbers, nothing leaves your server.</p>
+      </div>
+      <p id="flash-message" class="message" hidden></p>
+      <div class="khata-layout">
+        <section class="card chat-card" aria-label="Chat with Khata">
+          <div id="chat-log" class="chat-log" aria-live="polite"></div>
+          <div id="chat-suggestions" class="chips"></div>
+          <form id="chat-form" class="chat-form" autocomplete="off">
+            <input type="text" id="chat-input" placeholder="Ask e.g. what is my safe to spend?" maxlength="300" aria-label="Your question" />
+            <button type="submit" id="chat-send" class="primary-button">Send</button>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="section-heading">
+            <h2>Insights</h2>
+            <p>What Khata noticed today</p>
+          </div>
+          <ul id="insights-list" class="insights">
+            <li class="empty-state">Loading insights...</li>
+          </ul>
+        </section>
+      </div>
+    </main>
+
+    <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/layout.js"></script>
+    <script src="/frontend/js/script.js"></script>
+    <script src="/frontend/js/khata.js"></script>
+  </body>
+</html>
