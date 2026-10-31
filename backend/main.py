@@ -27,6 +27,8 @@ from pydantic import BaseModel, Field, StringConstraints, field_validator
 from backend.categorizer import merchant_keys
 from backend.categorizer import suggest as suggest_category
 from backend.database import get_connection
+from backend.goals import goal_progress
+from backend.khata import SUGGESTED_QUESTIONS, answer_question, build_insights
 from backend.transaction_parser import parse_transactions
 from backend.security import (
     create_access_token,
@@ -220,6 +222,21 @@ class Saving(BaseModel):
     amount: Money
     description: Text
     date: dt.date
+    goal_id: int | None = None  # put this saving towards a goal
+
+
+class Goal(BaseModel):
+    name: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+    ]
+    target_amount: Money
+    target_date: dt.date | None = None
+
+
+class KhataQuestion(BaseModel):
+    question: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=300)
+    ]
 
 
 class EmergencyFund(BaseModel):
@@ -296,63 +313,37 @@ def _record_login_failure(key: str) -> None:
 
 # -------------------- FRONTEND PAGES --------------------
 
-def page(name: str) -> FileResponse:
-    return FileResponse(TEMPLATES_DIR / name)
+# To add a page: create the HTML file in frontend/templates and add one line here.
+PAGES = {
+    "/": "index.html",
+    "/login": "login.html",
+    "/register": "register.html",
+    "/add-income": "add-income.html",
+    "/add-expense": "add-expense.html",
+    "/transactions-page": "transactions.html",
+    "/add-savings": "add-savings.html",
+    "/add-emergency-fund": "add-emergency-fund.html",
+    "/add-budget": "add-budget.html",
+    "/add-upcoming-expense": "add-upcoming-expense.html",
+    "/import-screenshot": "import-screenshot.html",
+    "/goals-page": "goals.html",
+    "/add-goal": "add-goal.html",
+    "/khata": "khata.html",
+}
 
 
-@app.get("/")
-def home():
-    return page("index.html")
+def _register_page(path: str, filename: str) -> None:
+    def serve():
+        file_path = TEMPLATES_DIR / filename
+        if not file_path.is_file():
+            raise HTTPException(status_code=404, detail="Page not found")
+        return FileResponse(file_path)
+
+    app.add_api_route(path, serve, methods=["GET"], include_in_schema=False)
 
 
-@app.get("/login")
-def login_page():
-    return page("login.html")
-
-
-@app.get("/register")
-def register_page():
-    return page("register.html")
-
-
-@app.get("/add-income")
-def add_income_page():
-    return page("add-income.html")
-
-
-@app.get("/add-expense")
-def add_expense_page():
-    return page("add-expense.html")
-
-
-@app.get("/transactions-page")
-def transactions_page():
-    return page("transactions.html")
-
-
-@app.get("/add-savings")
-def add_savings_page():
-    return page("add-savings.html")
-
-
-@app.get("/add-emergency-fund")
-def add_emergency_fund_page():
-    return page("add-emergency-fund.html")
-
-
-@app.get("/add-budget")
-def add_budget_page():
-    return page("add-budget.html")
-
-
-@app.get("/import-screenshot")
-def import_screenshot_page():
-    return page("import-screenshot.html")
-
-
-@app.get("/add-upcoming-expense")
-def add_upcoming_expense_page():
-    return page("add-upcoming-expense.html")
+for _path, _filename in PAGES.items():
+    _register_page(_path, _filename)
 
 
 # -------------------- TRANSACTIONS --------------------
@@ -608,14 +599,37 @@ def create_saving(
     user_id: int = Depends(get_current_user),
 ):
     try:
-        execute_write(
-            """
-            INSERT INTO savings (amount, description, date, user_id)
-            VALUES (%s, %s, %s, %s)
-            """,
-            (round(saving.amount, 2), saving.description, saving.date, user_id),
-        )
+        if saving.goal_id is not None:
+            goal = fetch_one(
+                "SELECT id FROM goals WHERE id = %s AND user_id = %s",
+                (saving.goal_id, user_id),
+            )
+            if not goal:
+                raise HTTPException(status_code=404, detail="Goal not found")
+            execute_write(
+                """
+                INSERT INTO savings (amount, description, date, user_id, goal_id)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
+                    round(saving.amount, 2),
+                    saving.description,
+                    saving.date,
+                    user_id,
+                    saving.goal_id,
+                ),
+            )
+        else:
+            execute_write(
+                """
+                INSERT INTO savings (amount, description, date, user_id)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (round(saving.amount, 2), saving.description, saving.date, user_id),
+            )
         return {"message": "Saving added successfully"}
+    except HTTPException:
+        raise
     except Exception:
         raise server_error("Unable to add saving")
 
@@ -634,6 +648,86 @@ def get_savings(user_id: int = Depends(get_current_user)):
         )
     except Exception:
         raise server_error("Unable to fetch savings")
+
+
+# -------------------- DREAM GOALS --------------------
+
+def load_goals(user_id: int, today: dt.date) -> list:
+    rows = fetch_all(
+        """
+        SELECT g.id, g.name, g.target_amount, g.target_date,
+               COALESCE(SUM(s.amount), 0) AS saved
+        FROM goals g
+        LEFT JOIN savings s ON s.goal_id = g.id AND s.user_id = g.user_id
+        WHERE g.user_id = %s
+        GROUP BY g.id, g.name, g.target_amount, g.target_date
+        ORDER BY g.id DESC
+        """,
+        (user_id,),
+    )
+    return [
+        goal_progress(
+            row["id"],
+            row["name"],
+            row["target_amount"],
+            row["saved"],
+            row["target_date"],
+            today,
+        )
+        for row in rows
+    ]
+
+
+@app.post("/goals")
+def create_goal(
+    goal: Goal,
+    user_id: int = Depends(get_current_user),
+):
+    try:
+        if goal.target_date and goal.target_date < dt.date.today():
+            raise HTTPException(
+                status_code=400, detail="Target date must be today or later"
+            )
+        execute_write(
+            """
+            INSERT INTO goals (name, target_amount, target_date, user_id)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (goal.name, round(goal.target_amount, 2), goal.target_date, user_id),
+        )
+        return {"message": "Goal added successfully"}
+    except HTTPException:
+        raise
+    except Exception:
+        raise server_error("Unable to add goal")
+
+
+@app.get("/goals")
+def get_goals(user_id: int = Depends(get_current_user)):
+    try:
+        return load_goals(user_id, dt.date.today())
+    except Exception:
+        raise server_error("Unable to fetch goals")
+
+
+@app.delete("/goals/{goal_id}")
+def delete_goal(
+    goal_id: int,
+    user_id: int = Depends(get_current_user),
+):
+    """Delete a goal. Money already saved towards it stays in your savings."""
+    try:
+        rowcount, _ = execute_write(
+            "DELETE FROM goals WHERE id = %s AND user_id = %s",
+            (goal_id, user_id),
+        )
+        if rowcount == 0:
+            raise HTTPException(status_code=404, detail="Goal not found")
+        return {"message": "Goal deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception:
+        raise server_error("Unable to delete goal")
 
 
 # -------------------- EMERGENCY FUND --------------------
@@ -867,42 +961,46 @@ def get_budgets(user_id: int = Depends(get_current_user)):
         raise server_error("Unable to fetch budgets")
 
 
+def budget_analysis(user_id: int) -> list:
+    budgets = fetch_all(
+        """
+        SELECT
+            b.id,
+            b.category,
+            b.month,
+            b.amount AS budget,
+            COALESCE(SUM(t.amount), 0) AS spent
+        FROM budgets b
+        LEFT JOIN transactions t
+            ON b.category = t.category
+            AND t.type = 'expense'
+            AND t.user_id = b.user_id
+            AND YEAR(t.date) = YEAR(b.month)
+            AND MONTH(t.date) = MONTH(b.month)
+        WHERE b.user_id = %s
+        GROUP BY b.id, b.category, b.month, b.amount
+        ORDER BY b.month DESC, b.category
+        """,
+        (user_id,),
+    )
+
+    for item in budgets:
+        item["budget"] = float(item["budget"])
+        item["spent"] = float(item["spent"])
+        item["remaining"] = round(item["budget"] - item["spent"], 2)
+        item["percent_used"] = (
+            round(item["spent"] / item["budget"] * 100, 1)
+            if item["budget"] > 0
+            else 0
+        )
+
+    return budgets
+
+
 @app.get("/budgets/analysis")
 def get_budget_analysis(user_id: int = Depends(get_current_user)):
     try:
-        budgets = fetch_all(
-            """
-            SELECT
-                b.id,
-                b.category,
-                b.month,
-                b.amount AS budget,
-                COALESCE(SUM(t.amount), 0) AS spent
-            FROM budgets b
-            LEFT JOIN transactions t
-                ON b.category = t.category
-                AND t.type = 'expense'
-                AND t.user_id = b.user_id
-                AND YEAR(t.date) = YEAR(b.month)
-                AND MONTH(t.date) = MONTH(b.month)
-            WHERE b.user_id = %s
-            GROUP BY b.id, b.category, b.month, b.amount
-            ORDER BY b.month DESC, b.category
-            """,
-            (user_id,),
-        )
-
-        for item in budgets:
-            item["budget"] = float(item["budget"])
-            item["spent"] = float(item["spent"])
-            item["remaining"] = round(item["budget"] - item["spent"], 2)
-            item["percent_used"] = (
-                round(item["spent"] / item["budget"] * 100, 1)
-                if item["budget"] > 0
-                else 0
-            )
-
-        return budgets
+        return budget_analysis(user_id)
     except Exception:
         raise server_error("Unable to analyze budgets")
 
@@ -974,6 +1072,106 @@ def khata_summary(user_id: int = Depends(get_current_user)):
         }
     except Exception:
         raise server_error("Unable to fetch Khata summary")
+
+
+# -------------------- KHATA ASSISTANT --------------------
+
+def build_snapshot(user_id: int, today: dt.date) -> dict:
+    """Collect the numbers Khata answers questions from (see backend/khata.py)."""
+    finances = calculate_finances(user_id)
+
+    month_start = today.replace(day=1)
+    next_month_start = (month_start + dt.timedelta(days=32)).replace(day=1)
+    last_month_start = (month_start - dt.timedelta(days=1)).replace(day=1)
+
+    def expenses_between(start, end) -> float:
+        row = fetch_one(
+            """
+            SELECT COALESCE(SUM(amount), 0) AS total FROM transactions
+            WHERE user_id = %s AND type = 'expense' AND date >= %s AND date < %s
+            """,
+            (user_id, start, end),
+        )
+        return float(row["total"])
+
+    categories = fetch_all(
+        """
+        SELECT category, SUM(amount) AS total FROM transactions
+        WHERE user_id = %s AND type = 'expense' AND date >= %s AND date < %s
+        GROUP BY category ORDER BY total DESC
+        """,
+        (user_id, month_start, next_month_start),
+    )
+    for category in categories:
+        category["total"] = float(category["total"])
+
+    biggest = fetch_one(
+        """
+        SELECT description, amount, date, category FROM transactions
+        WHERE user_id = %s AND type = 'expense' AND date >= %s AND date < %s
+        ORDER BY amount DESC, id DESC LIMIT 1
+        """,
+        (user_id, month_start, next_month_start),
+    )
+    if biggest:
+        biggest["amount"] = float(biggest["amount"])
+
+    upcoming = fetch_all(
+        """
+        SELECT description, amount, due_date FROM upcoming_expenses
+        WHERE user_id = %s AND due_date BETWEEN %s AND %s
+        ORDER BY due_date ASC LIMIT 10
+        """,
+        (user_id, today, today + dt.timedelta(days=30)),
+    )
+    for item in upcoming:
+        item["amount"] = float(item["amount"])
+
+    # Goals need the goals table; Khata should still work if it is missing.
+    try:
+        goals = load_goals(user_id, today)
+    except Exception:
+        logger.exception("Could not load goals for Khata; continuing without them")
+        goals = []
+
+    return {
+        "finances": finances,
+        "month": {
+            "spent": expenses_between(month_start, next_month_start),
+            "last_spent": expenses_between(last_month_start, month_start),
+            "categories": categories,
+            "biggest": biggest,
+        },
+        "budgets": budget_analysis(user_id),
+        "goals": goals,
+        "upcoming": upcoming,
+    }
+
+
+@app.get("/khata/insights")
+def khata_insights(user_id: int = Depends(get_current_user)):
+    try:
+        today = dt.date.today()
+        snapshot = build_snapshot(user_id, today)
+        return {
+            "insights": build_insights(snapshot, today),
+            "suggested_questions": SUGGESTED_QUESTIONS,
+        }
+    except Exception:
+        raise server_error("Unable to load Khata insights")
+
+
+@app.post("/khata/ask")
+def khata_ask(
+    payload: KhataQuestion,
+    user_id: int = Depends(get_current_user),
+):
+    try:
+        today = dt.date.today()
+        snapshot = build_snapshot(user_id, today)
+        return answer_question(payload.question, snapshot, today)
+    except Exception:
+        raise server_error("Unable to answer that right now")
 
 
 # -------------------- AUTHENTICATION --------------------
