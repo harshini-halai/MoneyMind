@@ -1,21 +1,11 @@
-﻿fastapi
-uvicorn
-pydantic
-mysql-connector-python
-python-dotenv
-pwdlib[argon2]
-PyJWT
-
-# Screenshot import (backend/transaction_ocr.py). Also install the Tesseract
-# program itself and set TESSERACT_CMD in .env if it is not on your PATH.
-pytesseract
-Pillow
-
-# Needed once the screenshot upload endpoint (UploadFile) is added:
-# python-multipart
-
-# Planned for Khata AI/ML features - not used by any code yet:
-# pandas
-# numpy
-# scikit-learn
-# openai
+﻿fastapi==0.162.0
+uvicorn==0.54.0
+pydantic==2.14.2
+mysql-connector-python==26.10.0
+python-dotenv==1.2.4
+pwdlib[argon2]==0.3.1
+PyJWT==2.15.1
+pytesseract==0.3.13
+Pillow==13.0.0
+# Needed for the screenshot upload endpoint (UploadFile / Form).
+python-multipart==0.0.33
