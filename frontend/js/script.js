@@ -10,16 +10,31 @@ const CHART_COLORS = [
 ];
 let lastCategories = null;
 
+function cssVar(name) {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(name)
+    .trim();
+}
+
+// Draws the spending doughnut with the plain canvas API (no chart library needed).
 function renderSpendingChart(categories) {
   lastCategories = categories;
   const canvas = document.getElementById("spending-chart");
+  const legend = document.getElementById("chart-legend");
   const emptyState = document.getElementById("chart-empty");
   if (!canvas) {
     return;
   }
 
-  if (!categories || categories.length === 0) {
+  const items = (categories || []).filter(function (item) {
+    return Number(item.total) > 0;
+  });
+
+  if (items.length === 0) {
     canvas.hidden = true;
+    if (legend) {
+      legend.hidden = true;
+    }
     if (emptyState) {
       emptyState.hidden = false;
     }
@@ -27,66 +42,67 @@ function renderSpendingChart(categories) {
   }
 
   canvas.hidden = false;
+  if (legend) {
+    legend.hidden = false;
+  }
   if (emptyState) {
     emptyState.hidden = true;
   }
 
-  if (typeof Chart === "undefined") {
-    if (emptyState) {
-      emptyState.textContent = "Chart library could not be loaded.";
-      emptyState.hidden = false;
-    }
-    return;
-  }
+  const total = items.reduce(function (sum, item) {
+    return sum + Number(item.total);
+  }, 0);
 
-  const existing = Chart.getChart(canvas);
-  if (existing) {
-    existing.destroy();
-  }
+  const size = 600;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, size, size);
 
-  const textColor = getComputedStyle(document.documentElement)
-    .getPropertyValue("--muted")
-    .trim();
-  const surface = getComputedStyle(document.documentElement)
-    .getPropertyValue("--surface")
-    .trim();
+  const center = size / 2;
+  const ringWidth = 110;
+  const radius = center - ringWidth / 2 - 10;
+  const gap = items.length > 1 ? 0.025 : 0;
+  let angle = -Math.PI / 2;
 
-  new Chart(canvas, {
-    type: "doughnut",
-    data: {
-      labels: categories.map(function (item) {
-        return item.category;
-      }),
-      datasets: [
-        {
-          data: categories.map(function (item) {
-            return item.total;
-          }),
-          backgroundColor: CHART_COLORS,
-          borderColor: surface,
-          borderWidth: 2,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      cutout: "62%",
-      plugins: {
-        legend: { position: "bottom", labels: { color: textColor } },
-        tooltip: {
-          callbacks: {
-            label: function (context) {
-              const total = context.dataset.data.reduce(function (sum, value) {
-                return sum + value;
-              }, 0);
-              const percentage = ((context.raw / total) * 100).toFixed(1);
-              return `${context.label}: ${formatMoney(context.raw)} (${percentage}%)`;
-            },
-          },
-        },
-      },
-    },
+  items.forEach(function (item, index) {
+    const sweep = (Number(item.total) / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(center, center, radius, angle + gap / 2, angle + sweep - gap / 2);
+    ctx.lineWidth = ringWidth;
+    ctx.strokeStyle = CHART_COLORS[index % CHART_COLORS.length];
+    ctx.stroke();
+    angle += sweep;
   });
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = cssVar("--muted");
+  ctx.font = "600 28px -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+  ctx.fillText("Total spent", center, center - 12);
+  ctx.fillStyle = cssVar("--text");
+  ctx.font = "700 40px -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+  ctx.fillText(formatMoney(total), center, center + 34);
+
+  if (legend) {
+    legend.innerHTML = "";
+    items.forEach(function (item, index) {
+      const row = document.createElement("li");
+      const dot = document.createElement("span");
+      dot.className = "legend-dot";
+      dot.style.background = CHART_COLORS[index % CHART_COLORS.length];
+      const name = document.createElement("span");
+      name.className = "legend-name";
+      name.textContent = item.category;
+      const value = document.createElement("span");
+      value.className = "legend-value";
+      const percent = ((Number(item.total) / total) * 100).toFixed(1);
+      value.textContent = `${formatMoney(item.total)} (${percent}%)`;
+      row.appendChild(dot);
+      row.appendChild(name);
+      row.appendChild(value);
+      legend.appendChild(row);
+    });
+  }
 }
 
 function renderInsights(insights) {

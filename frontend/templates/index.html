@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard - MoneyMind</title>
     <script src="/frontend/js/theme.js"></script>
-    <link rel="stylesheet" href="/frontend/style.css" />
+    <link rel="stylesheet" href="/frontend/style.css?v=3" />
   </head>
 
   <body data-auth="required" data-page="dashboard" data-title="Dashboard">
@@ -71,6 +71,7 @@
           </div>
           <div class="chart-container">
             <canvas id="spending-chart" hidden></canvas>
+            <ul id="chart-legend" class="chart-legend" hidden></ul>
             <p id="chart-empty" class="empty-state">No expenses to show yet.</p>
           </div>
         </section>
@@ -117,9 +118,8 @@
 
     <script src="/frontend/js/api.js"></script>
     <script src="/frontend/js/layout.js"></script>
-    <script src="/frontend/js/chart.umd.js"></script>
     <script src="/frontend/js/budget.js"></script>
-    <script src="/frontend/js/goals.js"></script>
-    <script src="/frontend/js/script.js"></script>
+    <script src="/frontend/js/goals.js?v=3"></script>
+    <script src="/frontend/js/script.js?v=3"></script>
   </body>
 </html>
