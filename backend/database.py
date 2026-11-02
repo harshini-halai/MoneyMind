@@ -62,6 +62,7 @@ def connection_settings() -> dict:
         "autocommit": True,
         # Fail fast instead of hanging a web worker when the database is down.
         "connection_timeout": int(os.getenv("DB_CONNECT_TIMEOUT", "10")),
+         "use_pure": True,
     }
 
     ca = _ca_file()
