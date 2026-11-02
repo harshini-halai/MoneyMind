@@ -1,15 +1,25 @@
 {
   "cSpell.words": [
+    "appuser",
+    "colours",
     "dotenv",
     "fastapi",
     "Khata",
     "mysql-connector-python",
     "numpy",
+    "pwdlib",
     "pycache",
     "pydantic",
+    "pytesseract",
+    "PYTHONDONTWRITEBYTECODE",
+    "PYTHONUNBUFFERED",
     "scikit",
+    "Segoe",
+    "Tesseract",
+    "themechange",
+    "topbar",
     "uvicorn",
-  
+    "venv"
   ],
   "python-envs.defaultEnvManager": "ms-python.python:system"
 }
