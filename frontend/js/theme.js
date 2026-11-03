@@ -33,3 +33,28 @@ function toggleTheme() {
   }
   document.dispatchEvent(new CustomEvent("themechange", { detail: next }));
 }
+
+// Site icons (favicon, phone home-screen icon, address-bar colour).
+// Added here because every page already loads this file in <head>.
+(function () {
+  function addTag(tag, attributes) {
+    var element = document.createElement(tag);
+    Object.keys(attributes).forEach(function (name) {
+      element.setAttribute(name, attributes[name]);
+    });
+    document.head.appendChild(element);
+  }
+  addTag("link", { rel: "icon", href: "/favicon.ico", sizes: "48x48" });
+  addTag("link", {
+    rel: "icon",
+    href: "/frontend/favicon.svg",
+    type: "image/svg+xml",
+    sizes: "any",
+  });
+  addTag("link", {
+    rel: "apple-touch-icon",
+    href: "/frontend/apple-touch-icon.png",
+  });
+  addTag("link", { rel: "manifest", href: "/frontend/site.webmanifest" });
+  addTag("meta", { name: "theme-color", content: "#0f2338" });
+})();

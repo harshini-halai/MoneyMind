@@ -1,0 +1,17 @@
+{
+  "name": "MoneyMind",
+  "short_name": "MoneyMind",
+  "description": "Manage money, build savings.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f2338",
+  "theme_color": "#0f2338",
+  "icons": [
+    {
+      "src": "/frontend/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    { "src": "/frontend/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -345,6 +345,23 @@ def _register_page(path: str, filename: str) -> None:
 for _path, _filename in PAGES.items():
     _register_page(_path, _filename)
 
+# -------------------- FAVICON & HEALTH CHECK --------------------
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(FRONTEND_DIR / "favicon.ico", media_type="image/x-icon")
+
+
+@app.api_route("/health", methods=["GET", "HEAD"], include_in_schema=False)
+def health():
+    """Called by an uptime monitor every few minutes. It also touches the
+    database lightly, so a free database is not left idle."""
+    try:
+        fetch_one("SELECT 1 AS ok")
+    except Exception:
+        logger.exception("Health check: database not reachable")
+        raise HTTPException(status_code=503, detail="Database not reachable")
+    return {"status": "ok"}
 
 # -------------------- TRANSACTIONS --------------------
 
