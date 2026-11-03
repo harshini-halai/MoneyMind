@@ -41,7 +41,7 @@ INTENTS = [
     ("safe_to_spend", r"safe.?to.?spend|can i spend|kharch kar (sakta|sakti)|kitna kharch kar"),
     ("compare_months", r"last month|previous month|pichle mahine|pichhle mahine|compare|vs last"),
     ("biggest_expense", r"biggest|largest|highest|sabse (bada|badi)|sabse zyada kharch"),
-    ("categories", r"categor|where.*(money|spend|spent|go)|kahan.*(kharch|paisa|paise)|top spend|most spen|sabse (zyada|jyada)"),
+    ("categories", r"category|where.*(money|spend|spent|go)|kahan.*(kharch|paisa|paise)|top spend|most spen|sabse (zyada|jyada)"),
     ("month_spending", r"(this month|is mahine|iss mahine|monthly).*(spen|kharch|expens)|(spen|kharch|expens).*(this month|is mahine|iss mahine)|how much.*spen"),
     ("budgets", r"budget"),
     ("goals", r"\bgoals?\b|dream"),
