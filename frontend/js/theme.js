@@ -58,3 +58,45 @@ function toggleTheme() {
   addTag("link", { rel: "manifest", href: "/frontend/site.webmanifest" });
   addTag("meta", { name: "theme-color", content: "#0f2338" });
 })();
+
+// Demo banner: shown only while the demo account's own token is in use.
+document.addEventListener("DOMContentLoaded", function () {
+  var token = null;
+  var demoToken = null;
+  try {
+    token = localStorage.getItem("moneymind_token");
+    demoToken = localStorage.getItem("moneymind_demo");
+  } catch (error) {
+    return;
+  }
+
+  var main = document.querySelector("main.content");
+  if (!main || !token || token !== demoToken) {
+    return;
+  }
+
+  var banner = document.createElement("div");
+  banner.className = "demo-banner";
+
+  var text = document.createElement("span");
+  text.textContent =
+    "You are viewing a demo with sample data. It is deleted after 24 hours.";
+
+  var button = document.createElement("button");
+  button.type = "button";
+  button.className = "demo-banner-button";
+  button.textContent = "Create your free account";
+  button.addEventListener("click", function () {
+    try {
+      localStorage.removeItem("moneymind_token");
+      localStorage.removeItem("moneymind_demo");
+    } catch (error) {
+      /* ignore */
+    }
+    window.location.href = "/register";
+  });
+
+  banner.appendChild(text);
+  banner.appendChild(button);
+  main.insertBefore(banner, main.firstChild);
+});

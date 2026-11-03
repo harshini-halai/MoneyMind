@@ -3,6 +3,7 @@ import io
 import logging
 import os
 import re
+import secrets
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -1240,3 +1241,161 @@ def login_user(user: UserLogin, request: Request):
     _login_failures.pop(key, None)
     token = create_access_token(db_user["id"])
     return {"access_token": token, "token_type": "bearer"}
+
+# -------------------- DEMO MODE --------------------
+# "Try the demo": one click makes a throw-away account filled with sample data,
+# so a visitor can look around without signing up. Each visitor gets their own
+# account, and accounts older than DEMO_MAX_AGE_HOURS are deleted (the database
+# deletes their rows too, because every table uses ON DELETE CASCADE).
+# Set DEMO_ENABLED=0 in the environment to switch the demo off.
+
+DEMO_ENABLED = os.getenv("DEMO_ENABLED", "1") != "0"
+DEMO_EMAIL_DOMAIN = "demo.moneymind.invalid"  # .invalid can never be a real address
+DEMO_MAX_AGE_HOURS = 24
+DEMO_MAX_ACCOUNTS = 300
+DEMO_PER_IP_LIMIT = 5
+DEMO_WINDOW_SECONDS = 60 * 60
+_demo_starts: dict[str, deque] = defaultdict(deque)
+
+
+def _check_demo_limit(key: str) -> None:
+    now = time.time()
+    attempts = _demo_starts[key]
+    while attempts and now - attempts[0] > DEMO_WINDOW_SECONDS:
+        attempts.popleft()
+    if len(attempts) >= DEMO_PER_IP_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many demo accounts from your network. Please try again in an hour.",
+        )
+    attempts.append(now)
+
+
+def delete_old_demo_users() -> None:
+    try:
+        execute_write(
+            "DELETE FROM users WHERE email LIKE %s "
+            "AND created_at < DATE_SUB(NOW(), INTERVAL %s HOUR)",
+            (f"%@{DEMO_EMAIL_DOMAIN}", DEMO_MAX_AGE_HOURS),
+        )
+    except Exception:
+        logger.exception("Could not delete old demo accounts; continuing")
+
+
+def seed_demo_data(user_id: int, today: dt.date) -> None:
+    """Sample data, dated relative to today so the dashboard always looks current."""
+    month_start = today.replace(day=1)
+    last_month_start = (month_start - dt.timedelta(days=1)).replace(day=1)
+
+    def this_month(days_ago: int) -> dt.date:
+        return max(month_start, today - dt.timedelta(days=days_ago))
+
+    def last_month(day: int) -> dt.date:
+        return last_month_start + dt.timedelta(days=day - 1)
+
+    transactions = [
+        ("Salary", "Other", 45000, month_start, "income"),
+        ("Freelance project", "Other", 8000, this_month(6), "income"),
+        ("Salary", "Other", 45000, last_month(1), "income"),
+        ("Swiggy dinner", "Food", 380, this_month(1), "expense"),
+        ("Big Bazaar groceries", "Food", 1450, this_month(4), "expense"),
+        ("Uber ride", "Travel", 260, this_month(2), "expense"),
+        ("Metro card recharge", "Travel", 500, this_month(7), "expense"),
+        ("Amazon headphones", "Shopping", 1799, this_month(5), "expense"),
+        ("Electricity bill", "Bills", 1240, this_month(8), "expense"),
+        ("Mobile recharge", "Bills", 399, this_month(3), "expense"),
+        ("Movie tickets", "Other", 600, this_month(9), "expense"),
+        ("Zomato lunch", "Food", 1600, last_month(5), "expense"),
+        ("Grocery run", "Food", 1500, last_month(12), "expense"),
+        ("Cab rides", "Travel", 900, last_month(10), "expense"),
+        ("Clothes", "Shopping", 2400, last_month(15), "expense"),
+        ("Rent and bills", "Bills", 1700, last_month(3), "expense"),
+        ("Weekend trip snacks", "Other", 500, last_month(20), "expense"),
+    ]
+    execute_many(
+        """
+        INSERT INTO transactions (description, category, amount, date, type, user_id)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        [(d, c, a, day, t, user_id) for d, c, a, day, t in transactions],
+    )
+
+    _, laptop_id = execute_write(
+        "INSERT INTO goals (name, target_amount, target_date, user_id) VALUES (%s, %s, %s, %s)",
+        ("Laptop", 60000, today + dt.timedelta(days=180), user_id),
+    )
+    _, trip_id = execute_write(
+        "INSERT INTO goals (name, target_amount, target_date, user_id) VALUES (%s, %s, %s, %s)",
+        ("Goa trip", 15000, today + dt.timedelta(days=90), user_id),
+    )
+    execute_many(
+        """
+        INSERT INTO savings (amount, description, date, user_id, goal_id)
+        VALUES (%s, %s, %s, %s, %s)
+        """,
+        [
+            (3000, "Monthly savings", this_month(10), user_id, None),
+            (5000, "Laptop fund", this_month(5), user_id, laptop_id),
+            (7000, "Laptop fund", last_month(18), user_id, laptop_id),
+            (4000, "Trip fund", this_month(3), user_id, trip_id),
+        ],
+    )
+    execute_many(
+        "INSERT INTO emergency_fund (amount, description, date, user_id) VALUES (%s, %s, %s, %s)",
+        [(5000, "Emergency reserve", this_month(12), user_id)],
+    )
+    execute_many(
+        "INSERT INTO upcoming_expenses (amount, description, due_date, user_id) VALUES (%s, %s, %s, %s)",
+        [
+            (12000, "Rent", today + dt.timedelta(days=4), user_id),
+            (649, "Netflix", today + dt.timedelta(days=10), user_id),
+            (8500, "Insurance premium", today + dt.timedelta(days=20), user_id),
+        ],
+    )
+    execute_many(
+        "INSERT INTO budgets (category, amount, month, user_id) VALUES (%s, %s, %s, %s)",
+        [
+            ("Food", 4000, month_start, user_id),
+            ("Travel", 1500, month_start, user_id),
+            ("Shopping", 2000, month_start, user_id),
+            ("Bills", 3000, month_start, user_id),
+        ],
+    )
+
+
+@app.post("/demo/start")
+def start_demo(request: Request):
+    if not DEMO_ENABLED:
+        raise HTTPException(status_code=404, detail="The demo is not available")
+
+    client = request.client.host if request.client else "unknown"
+    _check_demo_limit(client)
+
+    try:
+        delete_old_demo_users()
+        row = fetch_one(
+            "SELECT COUNT(*) AS n FROM users WHERE email LIKE %s",
+            (f"%@{DEMO_EMAIL_DOMAIN}",),
+        )
+        if row["n"] >= DEMO_MAX_ACCOUNTS:
+            raise HTTPException(
+                status_code=503,
+                detail="The demo is busy right now. Please try again in a little while.",
+            )
+
+        email = f"demo-{secrets.token_hex(8)}@{DEMO_EMAIL_DOMAIN}"
+        # Nobody knows this password, so a demo account can never be logged into normally.
+        _, user_id = execute_write(
+            "INSERT INTO users (name, email, password_hash) VALUES (%s, %s, %s)",
+            ("Demo User", email, hash_password(secrets.token_urlsafe(32))),
+        )
+        try:
+            seed_demo_data(user_id, dt.date.today())
+        except Exception:
+            execute_write("DELETE FROM users WHERE id = %s", (user_id,))
+            raise
+        return {"access_token": create_access_token(user_id), "token_type": "bearer"}
+    except HTTPException:
+        raise
+    except Exception:
+        raise server_error("Unable to start the demo")
