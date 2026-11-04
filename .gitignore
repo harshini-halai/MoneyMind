@@ -5,3 +5,4 @@ __pycache__/
 .venv/
 venv/
 test_image/
+.vscode/settings.json
