@@ -3,8 +3,65 @@
 // and edit them here -> only the rows you tick are saved.
 
 const IMPORT_CATEGORIES = ["Food", "Travel", "Shopping", "Bills", "Other"];
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // the server's limit for the uploaded file
+const MAX_ORIGINAL_BYTES = 30 * 1024 * 1024; // the picked file may be bigger: it is shrunk first
+const UPLOAD_MAX_WIDTH = 1000; // same width the server reads at
 let importPreviewUrl = null;
+
+// Phone screenshots are big. Shrinking them here first makes the upload (often on
+// mobile data) and the reading on the server much faster. If anything goes wrong
+// the original file is used, so this can never block an import.
+async function prepareForUpload(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    if (bitmap.width <= UPLOAD_MAX_WIDTH) {
+      bitmap.close();
+      return file;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = UPLOAD_MAX_WIDTH;
+    canvas.height = Math.round(
+      (bitmap.height * UPLOAD_MAX_WIDTH) / bitmap.width,
+    );
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#ffffff"; // JPEG has no transparency
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.imageSmoothingQuality = "high";
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+
+    const blob = await new Promise(function (resolve) {
+      canvas.toBlob(resolve, "image/jpeg", 0.9);
+    });
+    if (!blob || blob.size >= file.size) {
+      return file;
+    }
+    return new File([blob], "screenshot.jpg", { type: "image/jpeg" });
+  } catch (error) {
+    return file;
+  }
+}
+
+// Shows how long the reading has taken, and a hint when it is slow
+// (the free server may still be waking up). Returns a function that stops it.
+function startProgress(button) {
+  const started = Date.now();
+  const timer = setInterval(function () {
+    const seconds = Math.round((Date.now() - started) / 1000);
+    button.textContent = `Reading screenshot... ${seconds}s`;
+    if (seconds === 15) {
+      showMessage(
+        "import-message",
+        "This is taking longer than usual. The server may be waking up. Please keep this page open.",
+        "warning",
+      );
+    }
+  }, 1000);
+  return function () {
+    clearInterval(timer);
+  };
+}
 
 function makeCell(labelText, control, extraClass) {
   const cell = document.createElement("label");
@@ -211,18 +268,30 @@ document.addEventListener("DOMContentLoaded", function () {
       showMessage("import-message", "Choose a screenshot first", "error");
       return;
     }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      showMessage("import-message", "Image is too large (max 5 MB)", "error");
+    if (file.size > MAX_ORIGINAL_BYTES) {
+      showMessage("import-message", "Image is too large (max 30 MB)", "error");
       return;
     }
 
     const button = document.getElementById("import-scan");
     button.disabled = true;
-    button.textContent = "Reading screenshot...";
+    button.textContent = "Preparing image...";
+    let stopProgress = null;
 
     try {
+      const upload = await prepareForUpload(file);
+      if (upload.size > MAX_UPLOAD_BYTES) {
+        showMessage("import-message", "Image is too large (max 5 MB)", "error");
+        button.disabled = false;
+        button.textContent = "Scan screenshot";
+        return;
+      }
+
+      stopProgress = startProgress(button);
+      button.textContent = "Reading screenshot... 0s";
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", upload);
       formData.append(
         "default_type",
         document.getElementById("import-default-type").value,
@@ -233,6 +302,7 @@ document.addEventListener("DOMContentLoaded", function () {
         body: formData,
       });
 
+      showMessage("import-message", "");
       if (result.ok) {
         renderImportResults(result.data, file);
       } else {
@@ -246,6 +316,9 @@ document.addEventListener("DOMContentLoaded", function () {
       showMessage("import-message", "Unable to read the screenshot", "error");
     }
 
+    if (stopProgress) {
+      stopProgress();
+    }
     button.disabled = false;
     button.textContent = "Scan screenshot";
   });

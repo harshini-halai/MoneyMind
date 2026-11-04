@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import secrets
+import threading
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -479,6 +480,11 @@ MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_PIXELS = 25_000_000
 ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp"}
 
+   
+# Reading an image is heavy work. Only one runs at a time, so several people (or
+# demo visitors) cannot slow each other down until everything times out.
+OCR_QUEUE_WAIT_SECONDS = 20
+_ocr_slot = threading.Semaphore(1)
 
 @app.post("/import/screenshot")
 def import_screenshot(
@@ -519,7 +525,11 @@ def import_screenshot(
         raise
     except Exception:
         raise HTTPException(status_code=400, detail="That file is not a valid image")
-
+    if not _ocr_slot.acquire(timeout=OCR_QUEUE_WAIT_SECONDS):
+        raise HTTPException(
+            status_code=503,
+            detail="Another screenshot is being read right now. Please try again in a minute.",
+        )
     try:
         text = extract_text_from_image(image)
     except pytesseract.TesseractNotFoundError:
@@ -534,6 +544,8 @@ def import_screenshot(
         )
     except Exception:
         raise server_error("Unable to read the screenshot")
+    finally:
+        _ocr_slot.release()
 
     candidates = parse_transactions(text, default_type)
 
